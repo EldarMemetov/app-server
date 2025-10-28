@@ -37,3 +37,35 @@ export const userSigninSchema = Joi.object({
 export const userLoginWithGoogleOAuthSchema = Joi.object({
   code: Joi.string().required(),
 });
+
+export const userUpdateProfileSchema = Joi.object({
+  city: Joi.string().min(2).max(50),
+  role: Joi.string().valid(
+    'model',
+    'photographer',
+    'videographer',
+    'designer',
+    'producer',
+    'director',
+    'editor',
+    'retoucher',
+    'business',
+    'host',
+    'dj',
+    'fashionOwner',
+    'stylist',
+    'lighting',
+    'soundEngineer',
+  ),
+  aboutMe: Joi.string().max(500),
+  experience: Joi.string().max(500),
+  directions: Joi.array().items(Joi.string()),
+  onlineStatus: Joi.boolean(),
+  portfolio: Joi.array().items(
+    Joi.object({
+      type: Joi.string().valid('photo', 'video').required(),
+      url: Joi.string().uri().required(),
+      description: Joi.string().max(200),
+    }),
+  ),
+});

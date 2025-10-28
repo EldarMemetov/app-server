@@ -34,6 +34,18 @@ const userSchema = new Schema(
       type: String,
       required: true,
     },
+    rating: { type: Number, default: 0 },
+    experience: { type: String, default: '' },
+    directions: { type: [String], default: [] },
+    onlineStatus: { type: Boolean, default: false },
+    aboutMe: { type: String, default: '' },
+    portfolio: [
+      {
+        type: { type: String, enum: ['photo', 'video'], required: true },
+        url: { type: String, required: true },
+        description: { type: String, default: '' },
+      },
+    ],
   },
   { versionKey: false, timestamps: true },
 );
