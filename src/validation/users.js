@@ -39,24 +39,10 @@ export const userLoginWithGoogleOAuthSchema = Joi.object({
 });
 
 export const userUpdateProfileSchema = Joi.object({
+  name: Joi.string().min(2).max(50),
+  surname: Joi.string().min(2).max(50),
   city: Joi.string().min(2).max(50),
-  role: Joi.string().valid(
-    'model',
-    'photographer',
-    'videographer',
-    'designer',
-    'producer',
-    'director',
-    'editor',
-    'retoucher',
-    'business',
-    'host',
-    'dj',
-    'fashionOwner',
-    'stylist',
-    'lighting',
-    'soundEngineer',
-  ),
+  photo: Joi.string().uri(),
   aboutMe: Joi.string().max(500),
   experience: Joi.string().max(500),
   directions: Joi.array().items(Joi.string()),
