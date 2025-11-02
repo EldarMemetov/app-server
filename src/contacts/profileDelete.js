@@ -1,4 +1,6 @@
-import UserCollection from '../db/models/User';
+import UserCollection from '../db/models/User.js';
+import createHttpError from 'http-errors';
+
 // DELETE /profile/photo
 export const deleteProfilePhotoController = async (req, res) => {
   const { _id } = req.user;
@@ -9,12 +11,15 @@ export const deleteProfilePhotoController = async (req, res) => {
     { new: true },
   ).select('-password');
 
+  if (!updatedUser) throw createHttpError(404, 'User not found');
+
   res.json({
     status: 200,
     message: 'Profile photo removed successfully',
     data: updatedUser,
   });
 };
+
 // DELETE /profile/about
 export const deleteAboutController = async (req, res) => {
   const { _id } = req.user;
@@ -25,12 +30,15 @@ export const deleteAboutController = async (req, res) => {
     { new: true },
   ).select('-password');
 
+  if (!updatedUser) throw createHttpError(404, 'User not found');
+
   res.json({
     status: 200,
     message: 'About info removed successfully',
     data: updatedUser,
   });
 };
+
 // DELETE /profile/portfolio/:itemId
 export const deletePortfolioItemController = async (req, res) => {
   const { _id } = req.user;
@@ -42,12 +50,8 @@ export const deletePortfolioItemController = async (req, res) => {
     { new: true },
   ).select('-password');
 
-  if (!updatedUser) {
-    return res.status(404).json({
-      status: 404,
-      message: 'User or portfolio item not found',
-    });
-  }
+  if (!updatedUser)
+    throw createHttpError(404, 'User or portfolio item not found');
 
   res.json({
     status: 200,

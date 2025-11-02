@@ -12,3 +12,7 @@ export const createPostSchema = Joi.object({
 export const addCommentSchema = Joi.object({
   text: Joi.string().min(1).max(500).required(),
 });
+
+export const applySchema = Joi.object({
+  message: Joi.string().max(500).optional(),
+});

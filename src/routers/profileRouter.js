@@ -7,16 +7,26 @@ import { userUpdateProfileSchema } from '../validation/users.js';
 
 const profileRouter = Router();
 
+// Все руты требуют авторизации
 profileRouter.use(authenticate);
 
+// Получить свой профиль
 profileRouter.get('/', ctrlWrapper(profileController.getProfileController));
 
+// Обновить свой профиль
 profileRouter.patch(
   '/',
   validateBody(userUpdateProfileSchema),
   ctrlWrapper(profileController.updateProfileController),
 );
 
+// Получить профиль любого пользователя по ID
+profileRouter.get(
+  '/:id',
+  ctrlWrapper(profileController.getProfileByIdController),
+);
+
+// Получить все профили
 profileRouter.get(
   '/all',
   ctrlWrapper(profileController.getAllProfilesController),

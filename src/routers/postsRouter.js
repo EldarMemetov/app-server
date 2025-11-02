@@ -4,7 +4,7 @@ import validateBody from '../utils/validateBody.js';
 import ctrlWrapper from '../utils/ctrlWrapper.js';
 import * as postsController from '../contacts/posts.js';
 import { addCommentSchema, createPostSchema } from '../validation/posts.js';
-
+import { applySchema } from '../validation/posts.js';
 const postsRouter = Router();
 
 postsRouter.get('/', ctrlWrapper(postsController.getAllPostsController));
@@ -59,6 +59,25 @@ postsRouter.delete(
   '/:postId/comments/:commentId',
   authenticate,
   postsController.deleteCommentController,
+);
+
+postsRouter.patch(
+  '/:id/apply',
+  authenticate,
+  validateBody(applySchema),
+  ctrlWrapper(postsController.applyToPostController),
+);
+
+postsRouter.patch(
+  '/:id/assign/:userId',
+  authenticate,
+  ctrlWrapper(postsController.assignCandidateController),
+);
+
+postsRouter.patch(
+  '/:id/complete',
+  authenticate,
+  ctrlWrapper(postsController.completePostController),
 );
 
 export default postsRouter;
