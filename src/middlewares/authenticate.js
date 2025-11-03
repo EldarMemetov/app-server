@@ -27,7 +27,9 @@ const authenticate = async (req, res, next) => {
   if (!user) {
     return next(createHttpError(401, 'User not found'));
   }
-
+  if (user.isBlocked) {
+    return next(createHttpError(403, 'User is blocked'));
+  }
   req.user = user;
 
   next();

@@ -4,41 +4,50 @@ import { handleSaveError, setupUpdateOptions } from './hooks.js';
 
 const userSchema = new Schema(
   {
-    name: {
-      type: String,
-      required: true,
-    },
-    surname: {
-      type: String,
-      required: true,
-    },
-    city: {
-      type: String,
-      required: true,
-    },
-    photo: {
-      type: String,
-      required: true,
-    },
+    name: { type: String, required: true },
+    surname: { type: String, required: true },
+    city: { type: String, required: true },
+    photo: { type: String },
+
     role: {
       type: String,
       required: true,
+      enum: [
+        'model',
+        'photographer',
+        'videographer',
+        'designer',
+        'producer',
+        'director',
+        'editor',
+        'retoucher',
+        'business',
+        'host',
+        'dj',
+        'fashionOwner',
+        'stylist',
+        'lighting',
+        'soundEngineer',
+      ],
     },
-    email: {
+
+    accessRole: {
       type: String,
-      match: emailRegexp,
-      required: true,
-      unique: true,
+      enum: ['user', 'moderator', 'admin'],
+      default: 'user',
     },
-    password: {
-      type: String,
-      required: true,
-    },
+
+    email: { type: String, match: emailRegexp, required: true, unique: true },
+    password: { type: String, required: true },
+
     rating: { type: Number, default: 0 },
     experience: { type: String, default: '' },
     directions: { type: [String], default: [] },
     onlineStatus: { type: Boolean, default: false },
     aboutMe: { type: String, default: '' },
+
+    isBlocked: { type: Boolean, default: false },
+
     portfolio: [
       {
         type: { type: String, enum: ['photo', 'video'], required: true },
@@ -46,14 +55,14 @@ const userSchema = new Schema(
         description: { type: String, default: '' },
       },
     ],
+
+    needsReview: { type: Boolean, default: false },
   },
   { versionKey: false, timestamps: true },
 );
 
 userSchema.post('save', handleSaveError);
-
 userSchema.pre('findOneAndUpdate', setupUpdateOptions);
-
 userSchema.post('findOneAndUpdate', handleSaveError);
 
 const UserCollection = model('user', userSchema);

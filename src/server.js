@@ -15,7 +15,7 @@ import authRouter from './routers/auth.js';
 import cookieParser from 'cookie-parser';
 import profileRouter from './routers/profileRouter.js';
 import postsRouter from './routers/postsRouter.js';
-
+import moderatorRouter from './routers/moderatorRouter.js';
 export const setupServer = () => {
   const app = express();
 
@@ -27,6 +27,7 @@ export const setupServer = () => {
   app.use('/auth', authRouter);
   app.use('/profile', profileRouter);
   app.use('/posts', postsRouter);
+  app.use('/moderation', moderatorRouter);
   app.use(notFoundHandler);
 
   app.use(errorHandler);
