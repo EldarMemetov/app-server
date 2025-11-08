@@ -1,7 +1,7 @@
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://your-production-domain.com',
   'https://app-creative-people-dkod.vercel.app',
+  'https://app-server-o38y.onrender.com',
 ];
 
 const corsOptions = {
