@@ -8,11 +8,12 @@ import upload from '../middlewares/uploadMiddleware.js';
 import * as mediaController from '../contacts/profileMediaController.js';
 const profileRouter = Router();
 
+profileRouter.get(
+  '/all',
+  ctrlWrapper(profileController.getAllProfilesController),
+);
 // Все руты требуют авторизации
 profileRouter.use(authenticate);
-
-// Получить свой профиль
-profileRouter.get('/', ctrlWrapper(profileController.getProfileController));
 
 // Обновить свой профиль
 profileRouter.patch(
@@ -27,11 +28,6 @@ profileRouter.get(
   ctrlWrapper(profileController.getProfileByIdController),
 );
 
-// Получить все профили
-profileRouter.get(
-  '/all',
-  ctrlWrapper(profileController.getAllProfilesController),
-);
 profileRouter.post(
   '/upload-photo',
   upload.single('photo'),
