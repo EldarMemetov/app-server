@@ -6,6 +6,8 @@ import * as postsController from '../contacts/posts.js';
 import { addCommentSchema, createPostSchema } from '../validation/posts.js';
 import { applySchema } from '../validation/posts.js';
 import checkBlocked from '../middlewares/checkBlocked.js';
+import * as postMediaController from '../contacts/postMediaController.js';
+import upload from '../middlewares/uploadMiddleware.js';
 const postsRouter = Router();
 
 postsRouter.get('/', ctrlWrapper(postsController.getAllPostsController));
@@ -92,5 +94,11 @@ postsRouter.patch(
   checkBlocked,
   ctrlWrapper(postsController.completePostController),
 );
-
+postsRouter.post(
+  '/:id/media',
+  authenticate,
+  checkBlocked,
+  upload.array('files', 5),
+  ctrlWrapper(postMediaController.uploadPostMediaController),
+);
 export default postsRouter;

@@ -5,9 +5,8 @@ import * as authControllers from '../controllers/auth.js';
 import {
   userLoginWithGoogleOAuthSchema,
   userSigninSchema,
-  userSignupSchema,
 } from '../validation/users.js';
-
+import upload from '../middlewares/uploadMiddleware.js';
 import { requestResetEmailSchema } from '../validation/mail.js';
 
 import { resetPasswordSchema } from '../validation/auth.js';
@@ -16,7 +15,7 @@ const authRouter = Router();
 
 authRouter.post(
   '/register',
-  validateBody(userSignupSchema),
+  upload.single('photo'),
   ctrlWrapper(authControllers.signupController),
 );
 

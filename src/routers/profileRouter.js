@@ -4,7 +4,8 @@ import validateBody from '../utils/validateBody.js';
 import ctrlWrapper from '../utils/ctrlWrapper.js';
 import * as profileController from '../contacts/profileController.js';
 import { userUpdateProfileSchema } from '../validation/users.js';
-
+import upload from '../middlewares/uploadMiddleware.js';
+import * as mediaController from '../contacts/profileMediaController.js';
 const profileRouter = Router();
 
 // Все руты требуют авторизации
@@ -31,5 +32,9 @@ profileRouter.get(
   '/all',
   ctrlWrapper(profileController.getAllProfilesController),
 );
-
+profileRouter.post(
+  '/upload-photo',
+  upload.single('photo'),
+  ctrlWrapper(mediaController.uploadProfilePhotoController),
+);
 export default profileRouter;

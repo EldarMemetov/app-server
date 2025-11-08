@@ -53,6 +53,7 @@ const userSchema = new Schema(
         type: { type: String, enum: ['photo', 'video'], required: true },
         url: { type: String, required: true },
         description: { type: String, default: '' },
+        public_id: { type: String },
       },
     ],
 

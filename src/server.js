@@ -11,6 +11,7 @@ import errorHandler from './middlewares/errorHandler.js';
 import logger from './middlewares/logger.js';
 
 import authRouter from './routers/auth.js';
+import portfolioRouter from './routers/portfolioRouter.js';
 
 import cookieParser from 'cookie-parser';
 import profileRouter from './routers/profileRouter.js';
@@ -28,6 +29,7 @@ export const setupServer = () => {
   app.use('/profile', profileRouter);
   app.use('/posts', postsRouter);
   app.use('/moderation', moderatorRouter);
+  app.use('/portfolio', portfolioRouter);
   app.use(notFoundHandler);
 
   app.use(errorHandler);

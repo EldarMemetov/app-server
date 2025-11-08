@@ -9,7 +9,13 @@ const postSchema = new Schema(
     },
     title: { type: String, required: true, trim: true },
     description: { type: String, required: true },
-    photo: { type: String, default: '' },
+    media: [
+      {
+        type: { type: String, enum: ['photo', 'video'], required: true },
+        url: { type: String, required: true },
+        public_id: { type: String },
+      },
+    ],
     roleNeeded: { type: [String], default: [] },
     city: { type: String, required: true },
     date: { type: Date },

@@ -1,7 +1,8 @@
 import * as authServices from '../contacts/auth.js';
 import { resetPassword } from '../contacts/auth.js';
 import { generateGoogleOAuthUrl } from '../utils/googleOAuth.js';
-
+import { signup } from '../contacts/auth.js';
+import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
 const setupSession = (res, session) => {
   res.cookie('refreshToken', session.refreshToken, {
     httpOnly: true,
@@ -15,7 +16,14 @@ const setupSession = (res, session) => {
 };
 
 export const signupController = async (req, res) => {
-  const newUser = await authServices.signup(req.body);
+  if (!req.file) {
+    return res.status(400).json({ message: 'Photo is required' });
+  }
+
+  const { url: photoUrl } = await saveFileToCloudinary(req.file);
+
+  const newUser = await signup({ ...req.body, photo: photoUrl });
+
   res.status(201).json({
     status: 201,
     message: 'Successfully register user',
