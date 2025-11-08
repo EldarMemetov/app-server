@@ -3,18 +3,35 @@ import { resetPassword } from '../contacts/auth.js';
 import { generateGoogleOAuthUrl } from '../utils/googleOAuth.js';
 import { signup } from '../contacts/auth.js';
 import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
+
+// const setupSession = (res, session) => {
+//   res.cookie('refreshToken', session.refreshToken, {
+//     httpOnly: true,
+//     expire: new Date(Date.now() + session.refreshTokenValidUntil),
+//   });
+
+//   res.cookie('sessionId', session._id, {
+//     httpOnly: true,
+//     expire: new Date(Date.now() + session.refreshTokenValidUntil),
+//   });
+// };
 const setupSession = (res, session) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+
   res.cookie('refreshToken', session.refreshToken, {
     httpOnly: true,
-    expire: new Date(Date.now() + session.refreshTokenValidUntil),
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    expires: new Date(Date.now() + session.refreshTokenValidUntil),
   });
 
   res.cookie('sessionId', session._id, {
     httpOnly: true,
-    expire: new Date(Date.now() + session.refreshTokenValidUntil),
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    expires: new Date(Date.now() + session.refreshTokenValidUntil),
   });
 };
-
 export const signupController = async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'Photo is required' });
