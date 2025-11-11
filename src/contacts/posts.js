@@ -1,7 +1,33 @@
 import PostCollection from '../db/models/Post.js';
 import UserCollection from '../db/models/User.js';
 import createHttpError from 'http-errors';
+import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
+export const createPostWithMediaController = async (req, res) => {
+  const { _id: userId } = req.user;
+  if (!userId) throw createHttpError(401, 'Unauthorized');
 
+  const postData = { ...req.body, author: userId };
+  const newPost = await PostCollection.create(postData);
+
+  if (req.files && req.files.length > 0) {
+    const uploadedMedia = [];
+    for (const file of req.files) {
+      const { url, public_id } = await saveFileToCloudinary(file);
+
+      const type = file.mimetype.startsWith('video') ? 'video' : 'photo';
+      uploadedMedia.push({ type, url, public_id });
+    }
+
+    newPost.media = uploadedMedia;
+    await newPost.save();
+  }
+
+  res.status(201).json({
+    status: 201,
+    message: 'Post created with media successfully',
+    data: newPost,
+  });
+};
 export const createPostController = async (req, res) => {
   const { _id: userId } = req.user;
 

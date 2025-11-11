@@ -17,12 +17,14 @@ const postSchema = new Schema(
       },
     ],
     roleNeeded: { type: [String], default: [] },
+    country: { type: String, required: true },
     city: { type: String, required: true },
     date: { type: Date },
     type: {
       type: String,
       enum: ['paid', 'tfp', 'collaboration'],
       default: 'tfp',
+      price: { type: Number, default: 0 },
     },
 
     status: {

@@ -3,7 +3,7 @@ import { resetPassword } from '../contacts/auth.js';
 import { generateGoogleOAuthUrl } from '../utils/googleOAuth.js';
 import { signup } from '../contacts/auth.js';
 import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
-
+import { refreshTokenLifetime } from '../constants/users.js';
 // const setupSession = (res, session) => {
 //   res.cookie('refreshToken', session.refreshToken, {
 //     httpOnly: true,
@@ -15,6 +15,7 @@ import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
 //     expire: new Date(Date.now() + session.refreshTokenValidUntil),
 //   });
 // };
+
 const setupSession = (res, session) => {
   const isProduction = process.env.NODE_ENV === 'production';
 
@@ -22,22 +23,24 @@ const setupSession = (res, session) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? 'none' : 'lax',
-    expires: new Date(Date.now() + session.refreshTokenValidUntil),
+    expires: new Date(Date.now() + refreshTokenLifetime),
   });
 
   res.cookie('sessionId', session._id, {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? 'none' : 'lax',
-    expires: new Date(Date.now() + session.refreshTokenValidUntil),
+    expires: new Date(Date.now() + refreshTokenLifetime),
   });
 };
-export const signupController = async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: 'Photo is required' });
-  }
 
-  const { url: photoUrl } = await saveFileToCloudinary(req.file);
+export const signupController = async (req, res) => {
+  let photoUrl;
+
+  if (req.file) {
+    const result = await saveFileToCloudinary(req.file);
+    photoUrl = result.url;
+  }
 
   const newUser = await signup({ ...req.body, photo: photoUrl });
 

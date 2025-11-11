@@ -5,9 +5,11 @@ export const createPostSchema = Joi.object({
   description: Joi.string().min(10).max(2000).required(),
   photo: Joi.string().uri().optional(),
   roleNeeded: Joi.array().items(Joi.string()).optional(),
-  city: Joi.string().required(),
+  country: Joi.string().min(2).max(100).required(),
+  city: Joi.string().min(2).max(50).required(),
   date: Joi.date().optional(),
   type: Joi.string().valid('paid', 'tfp', 'collaboration').optional(),
+  price: Joi.number().min(0).optional(),
 });
 export const addCommentSchema = Joi.object({
   text: Joi.string().min(1).max(500).required(),

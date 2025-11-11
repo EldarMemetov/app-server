@@ -6,18 +6,13 @@ import {
   userLoginWithGoogleOAuthSchema,
   userSigninSchema,
 } from '../validation/users.js';
-import upload from '../middlewares/uploadMiddleware.js';
 import { requestResetEmailSchema } from '../validation/mail.js';
 
 import { resetPasswordSchema } from '../validation/auth.js';
 
 const authRouter = Router();
 
-authRouter.post(
-  '/register',
-  upload.single('photo'),
-  ctrlWrapper(authControllers.signupController),
-);
+authRouter.post('/register', ctrlWrapper(authControllers.signupController));
 
 authRouter.post(
   '/login',

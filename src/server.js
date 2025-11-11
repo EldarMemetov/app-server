@@ -13,6 +13,7 @@ import profileRouter from './routers/profileRouter.js';
 import postsRouter from './routers/postsRouter.js';
 import moderatorRouter from './routers/moderatorRouter.js';
 import portfolioRouter from './routers/portfolioRouter.js';
+import locationRouter from './routers/locationRouter.js';
 import corsOptions from './utils/corsOptions.js';
 
 export const setupServer = () => {
@@ -39,6 +40,7 @@ export const setupServer = () => {
   app.use('/posts', postsRouter);
   app.use('/moderation', moderatorRouter);
   app.use('/portfolio', portfolioRouter);
+  app.use('/location', locationRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

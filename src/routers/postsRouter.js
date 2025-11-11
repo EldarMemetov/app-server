@@ -8,18 +8,28 @@ import { applySchema } from '../validation/posts.js';
 import checkBlocked from '../middlewares/checkBlocked.js';
 import * as postMediaController from '../contacts/postMediaController.js';
 import upload from '../middlewares/uploadMiddleware.js';
+import { filterPostsController } from '../contacts/filterController.js';
 const postsRouter = Router();
-
+postsRouter.get('/filter', ctrlWrapper(filterPostsController));
 postsRouter.get('/', ctrlWrapper(postsController.getAllPostsController));
 postsRouter.get('/:id', ctrlWrapper(postsController.getPostByIdController));
 
 postsRouter.post(
-  '/',
+  '/add',
   authenticate,
   checkBlocked,
   validateBody(createPostSchema),
   ctrlWrapper(postsController.createPostController),
 );
+
+postsRouter.post(
+  '/',
+  authenticate,
+  checkBlocked,
+  upload.array('files', 5),
+  ctrlWrapper(postsController.createPostWithMediaController),
+);
+
 postsRouter.patch(
   '/:id',
   authenticate,
@@ -101,4 +111,5 @@ postsRouter.post(
   upload.array('files', 5),
   ctrlWrapper(postMediaController.uploadPostMediaController),
 );
+
 export default postsRouter;

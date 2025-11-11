@@ -4,8 +4,9 @@ import { emailRegexp } from '../constants/users.js';
 export const userSignupSchema = Joi.object({
   name: Joi.string().min(2).max(50).required(),
   surname: Joi.string().min(2).max(50).required(),
+  country: Joi.string().min(2).max(100).required(),
   city: Joi.string().min(2).max(50).required(),
-  photo: Joi.string().uri().required(),
+  photo: Joi.string().uri(),
   email: Joi.string().pattern(emailRegexp).required(),
   role: Joi.string()
     .valid(
@@ -41,7 +42,8 @@ export const userLoginWithGoogleOAuthSchema = Joi.object({
 export const userUpdateProfileSchema = Joi.object({
   name: Joi.string().min(2).max(50),
   surname: Joi.string().min(2).max(50),
-  city: Joi.string().min(2).max(50),
+  country: Joi.string().min(2).max(100).required(),
+  city: Joi.string().min(2).max(50).required(),
   photo: Joi.string().uri(),
   aboutMe: Joi.string().max(500),
   experience: Joi.string().max(500),
