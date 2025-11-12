@@ -7,7 +7,7 @@ export const createPostSchema = Joi.object({
   roleNeeded: Joi.array().items(Joi.string()).optional(),
   country: Joi.string().min(2).max(100).required(),
   city: Joi.string().min(2).max(50).required(),
-  date: Joi.date().optional(),
+  date: Joi.date().required(),
   type: Joi.string().valid('paid', 'tfp', 'collaboration').optional(),
   price: Joi.number().min(0).optional(),
 });
