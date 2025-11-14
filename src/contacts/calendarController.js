@@ -47,7 +47,6 @@ export const updateEventController = async (req, res) => {
   const event = await CalendarEvent.findById(id);
   if (!event) throw createHttpError(404, 'Event not found');
 
-  // Только создатель события может его изменять
   if (event.createdBy.toString() !== userId.toString()) {
     throw createHttpError(403, 'You can edit only your own events');
   }
