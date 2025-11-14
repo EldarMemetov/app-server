@@ -16,6 +16,11 @@ profileRouter.get(
 // Все руты требуют авторизации
 profileRouter.use(authenticate);
 
+profileRouter.get(
+  '/me',
+  authenticate,
+  ctrlWrapper(profileController.getProfileController),
+);
 // Обновить свой профиль
 profileRouter.patch(
   '/',
