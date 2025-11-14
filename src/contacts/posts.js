@@ -1,7 +1,8 @@
 import PostCollection from '../db/models/Post.js';
-import UserCollection from '../db/models/User.js';
+
 import createHttpError from 'http-errors';
 import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
+
 export const createPostWithMediaController = async (req, res) => {
   const { _id: userId } = req.user;
   if (!userId) throw createHttpError(401, 'Unauthorized');
@@ -303,98 +304,5 @@ export const deleteCommentController = async (req, res) => {
   res.json({
     status: 200,
     message: 'Comment deleted successfully',
-  });
-};
-
-// ✅ Подать заявку на пост
-export const applyToPostController = async (req, res) => {
-  const { id } = req.params; // postId
-  const userId = req.user._id;
-  const { message } = req.body;
-
-  const post = await PostCollection.findById(id);
-  if (!post) throw createHttpError(404, 'Post not found');
-  if (post.status !== 'open')
-    throw createHttpError(400, 'Applications are closed for this post');
-
-  const alreadyApplied = post.candidates.some(
-    (c) => c.user.toString() === userId.toString(),
-  );
-  if (alreadyApplied)
-    throw createHttpError(400, 'You already applied to this post');
-
-  post.candidates.push({ user: userId, message });
-  await post.save();
-
-  res.status(201).json({
-    status: 201,
-    message: 'Application submitted successfully',
-    data: post.candidates,
-  });
-};
-
-// ✅ Назначить кандидата
-export const assignCandidateController = async (req, res) => {
-  const { id, userId } = req.params; // postId, candidate userId
-  const currentUserId = req.user._id;
-
-  const post = await PostCollection.findById(id);
-  if (!post) throw createHttpError(404, 'Post not found');
-
-  if (post.author.toString() !== currentUserId.toString()) {
-    throw createHttpError(403, 'Only the post author can assign candidates');
-  }
-
-  const candidateExists = post.candidates.some(
-    (c) => c.user.toString() === userId.toString(),
-  );
-  if (!candidateExists) {
-    throw createHttpError(404, 'Candidate not found in this post');
-  }
-
-  post.assignedTo = userId;
-  post.status = 'in_progress';
-  await post.save();
-
-  res.json({
-    status: 200,
-    message: 'Candidate assigned and post moved to in_progress',
-    data: post,
-  });
-};
-
-// ✅ Завершить пост и начислить рейтинг
-export const completePostController = async (req, res) => {
-  const { id } = req.params;
-  const currentUserId = req.user._id;
-
-  const post = await PostCollection.findById(id);
-  if (!post) throw createHttpError(404, 'Post not found');
-
-  if (post.author.toString() !== currentUserId.toString()) {
-    throw createHttpError(403, 'Only the post author can complete it');
-  }
-
-  if (post.status !== 'in_progress') {
-    throw createHttpError(400, 'Post is not in progress');
-  }
-
-  post.status = 'completed';
-  await post.save();
-
-  // 🎯 Начисляем рейтинг
-  if (post.assignedTo) {
-    await UserCollection.findByIdAndUpdate(post.assignedTo, {
-      $inc: { rating: 10 },
-    });
-    await UserCollection.findByIdAndUpdate(post.author, {
-      $inc: { rating: 5 },
-    });
-  }
-
-  res.json({
-    status: 200,
-    message: 'Post completed and ratings updated',
-    data: post,
   });
 };

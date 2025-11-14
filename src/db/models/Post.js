@@ -40,9 +40,9 @@ const postSchema = new Schema(
       },
     ],
     assignedTo: {
-      type: Schema.Types.ObjectId,
+      type: [Schema.Types.ObjectId],
       ref: 'user',
-      default: null,
+      default: [],
     },
 
     likes: [{ type: Schema.Types.ObjectId, ref: 'user' }],

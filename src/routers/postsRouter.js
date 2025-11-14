@@ -9,7 +9,9 @@ import checkBlocked from '../middlewares/checkBlocked.js';
 import * as postMediaController from '../contacts/postMediaController.js';
 import upload from '../middlewares/uploadMiddleware.js';
 import { filterPostsController } from '../contacts/filterController.js';
+import * as postNotifications from '../contacts/postNotifications.js';
 const postsRouter = Router();
+
 postsRouter.get('/filter', ctrlWrapper(filterPostsController));
 postsRouter.get('/', ctrlWrapper(postsController.getAllPostsController));
 postsRouter.get('/:id', ctrlWrapper(postsController.getPostByIdController));
@@ -88,21 +90,21 @@ postsRouter.patch(
   authenticate,
   checkBlocked,
   validateBody(applySchema),
-  ctrlWrapper(postsController.applyToPostController),
+  ctrlWrapper(postNotifications.applyToPostController),
 );
 
 postsRouter.patch(
-  '/:id/assign/:userId',
+  '/:id/assign',
   authenticate,
   checkBlocked,
-  ctrlWrapper(postsController.assignCandidateController),
+  ctrlWrapper(postNotifications.assignCandidateController),
 );
 
 postsRouter.patch(
   '/:id/complete',
   authenticate,
   checkBlocked,
-  ctrlWrapper(postsController.completePostController),
+  ctrlWrapper(postNotifications.completePostController),
 );
 postsRouter.post(
   '/:id/media',

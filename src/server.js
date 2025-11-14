@@ -15,6 +15,7 @@ import moderatorRouter from './routers/moderatorRouter.js';
 import portfolioRouter from './routers/portfolioRouter.js';
 import locationRouter from './routers/locationRouter.js';
 import corsOptions from './utils/corsOptions.js';
+import notificationsRouter from './routers/notificationsRouter.js';
 
 export const setupServer = () => {
   const app = express();
@@ -41,6 +42,7 @@ export const setupServer = () => {
   app.use('/moderation', moderatorRouter);
   app.use('/portfolio', portfolioRouter);
   app.use('/location', locationRouter);
+  app.use('/notifications', notificationsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
