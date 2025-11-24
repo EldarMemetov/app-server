@@ -3,36 +3,36 @@ import { resetPassword } from '../contacts/auth.js';
 import { generateGoogleOAuthUrl } from '../utils/googleOAuth.js';
 import { signup } from '../contacts/auth.js';
 import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
-import { refreshTokenLifetime } from '../constants/users.js';
-// const setupSession = (res, session) => {
-//   res.cookie('refreshToken', session.refreshToken, {
-//     httpOnly: true,
-//     expire: new Date(Date.now() + session.refreshTokenValidUntil),
-//   });
-
-//   res.cookie('sessionId', session._id, {
-//     httpOnly: true,
-//     expire: new Date(Date.now() + session.refreshTokenValidUntil),
-//   });
-// };
-
+// import { refreshTokenLifetime } from '../constants/users.js';
 const setupSession = (res, session) => {
-  const isProduction = process.env.NODE_ENV === 'production';
-
   res.cookie('refreshToken', session.refreshToken, {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'none' : 'lax',
-    expires: new Date(Date.now() + refreshTokenLifetime),
+    expire: new Date(Date.now() + session.refreshTokenValidUntil),
   });
 
   res.cookie('sessionId', session._id, {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'none' : 'lax',
-    expires: new Date(Date.now() + refreshTokenLifetime),
+    expire: new Date(Date.now() + session.refreshTokenValidUntil),
   });
 };
+
+// const setupSession = (res, session) => {
+//   const isProduction = process.env.NODE_ENV === 'production';
+
+//   res.cookie('refreshToken', session.refreshToken, {
+//     httpOnly: true,
+//     secure: isProduction,
+//     sameSite: isProduction ? 'none' : 'lax',
+//     expires: new Date(Date.now() + refreshTokenLifetime),
+//   });
+
+//   res.cookie('sessionId', session._id, {
+//     httpOnly: true,
+//     secure: isProduction,
+//     sameSite: isProduction ? 'none' : 'lax',
+//     expires: new Date(Date.now() + refreshTokenLifetime),
+//   });
+// };
 
 export const signupController = async (req, res) => {
   let photoUrl;
