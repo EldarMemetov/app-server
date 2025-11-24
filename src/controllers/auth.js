@@ -4,17 +4,6 @@ import { generateGoogleOAuthUrl } from '../utils/googleOAuth.js';
 import { signup } from '../contacts/auth.js';
 import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
 import { env } from '../utils/env.js';
-// const setupSession = (res, session) => {
-//   res.cookie('refreshToken', session.refreshToken, {
-//     httpOnly: true,
-//     expire: new Date(Date.now() + session.refreshTokenValidUntil),
-//   });
-
-//   res.cookie('sessionId', session._id, {
-//     httpOnly: true,
-//     expire: new Date(Date.now() + session.refreshTokenValidUntil),
-//   });
-// };
 
 const setupSession = (res, session) => {
   const maxAge = session.refreshTokenValidUntil - Date.now();

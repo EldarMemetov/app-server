@@ -1,6 +1,6 @@
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://app-creative-people-dkod.vercel.app',
+  'https://app-creative-people.vercel.app',
   'https://app-server-o38y.onrender.com',
 ];
 
