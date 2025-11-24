@@ -3,38 +3,38 @@ import { resetPassword } from '../contacts/auth.js';
 import { generateGoogleOAuthUrl } from '../utils/googleOAuth.js';
 import { signup } from '../contacts/auth.js';
 import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
-import { env } from '../utils/env.js';
-// const setupSession = (res, session) => {
-//   res.cookie('refreshToken', session.refreshToken, {
-//     httpOnly: true,
-//     expire: new Date(Date.now() + session.refreshTokenValidUntil),
-//   });
-
-//   res.cookie('sessionId', session._id, {
-//     httpOnly: true,
-//     expire: new Date(Date.now() + session.refreshTokenValidUntil),
-//   });
-// };
-
-export const setupSession = (res, session) => {
-  const isProduction = env('NODE_ENV', 'development') === 'production';
-
+// import { env } from '../utils/env.js';
+const setupSession = (res, session) => {
   res.cookie('refreshToken', session.refreshToken, {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'None' : 'Lax',
-    expires: session.refreshTokenValidUntil,
-    path: '/',
+    expire: new Date(Date.now() + session.refreshTokenValidUntil),
   });
 
   res.cookie('sessionId', session._id, {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'None' : 'Lax',
-    expires: session.refreshTokenValidUntil,
-    path: '/',
+    expire: new Date(Date.now() + session.refreshTokenValidUntil),
   });
 };
+
+// export const setupSession = (res, session) => {
+//   const isProduction = env('NODE_ENV', 'development') === 'production';
+
+//   res.cookie('refreshToken', session.refreshToken, {
+//     httpOnly: true,
+//     secure: isProduction,
+//     sameSite: isProduction ? 'None' : 'Lax',
+//     expires: session.refreshTokenValidUntil,
+//     path: '/',
+//   });
+
+//   res.cookie('sessionId', session._id, {
+//     httpOnly: true,
+//     secure: isProduction,
+//     sameSite: isProduction ? 'None' : 'Lax',
+//     expires: session.refreshTokenValidUntil,
+//     path: '/',
+//   });
+// };
 
 export const signupController = async (req, res) => {
   let photoUrl;
