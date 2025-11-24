@@ -17,16 +17,22 @@ import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
 // };
 
 const setupSession = (res, session) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+
   res.cookie('refreshToken', session.refreshToken, {
     httpOnly: true,
-    sameSite: 'lax',
-    expires: new Date(session.refreshTokenValidUntil),
+    secure: isProduction,
+    sameSite: isProduction ? 'None' : 'Lax',
+    expires: session.refreshTokenValidUntil,
+    path: '/',
   });
 
   res.cookie('sessionId', session._id, {
     httpOnly: true,
-    sameSite: 'lax',
-    expires: new Date(session.refreshTokenValidUntil),
+    secure: isProduction,
+    sameSite: isProduction ? 'None' : 'Lax',
+    expires: session.refreshTokenValidUntil,
+    path: '/',
   });
 };
 
