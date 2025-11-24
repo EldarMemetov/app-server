@@ -3,7 +3,7 @@ import { resetPassword } from '../contacts/auth.js';
 import { generateGoogleOAuthUrl } from '../utils/googleOAuth.js';
 import { signup } from '../contacts/auth.js';
 import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
-
+import { env } from '../utils/env.js';
 // const setupSession = (res, session) => {
 //   res.cookie('refreshToken', session.refreshToken, {
 //     httpOnly: true,
@@ -16,8 +16,8 @@ import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
 //   });
 // };
 
-const setupSession = (res, session) => {
-  const isProduction = process.env.NODE_ENV === 'production';
+export const setupSession = (res, session) => {
+  const isProduction = env('NODE_ENV', 'development') === 'production';
 
   res.cookie('refreshToken', session.refreshToken, {
     httpOnly: true,
