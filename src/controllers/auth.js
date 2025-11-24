@@ -3,7 +3,7 @@ import { resetPassword } from '../contacts/auth.js';
 import { generateGoogleOAuthUrl } from '../utils/googleOAuth.js';
 import { signup } from '../contacts/auth.js';
 import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
-
+import { env } from '../utils/env.js';
 // const setupSession = (res, session) => {
 //   res.cookie('refreshToken', session.refreshToken, {
 //     httpOnly: true,
@@ -19,17 +19,18 @@ import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
 const setupSession = (res, session) => {
   const maxAge = session.refreshTokenValidUntil - Date.now();
 
-  res.cookie('refreshToken', session.refreshToken, {
-    httpOnly: true,
-    path: '/',
-    maxAge,
-  });
+  const isProduction = env('NODE_ENV', 'development') === 'production';
 
-  res.cookie('sessionId', session._id, {
+  const cookieOptions = {
     httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
     path: '/',
     maxAge,
-  });
+  };
+
+  res.cookie('refreshToken', session.refreshToken, cookieOptions);
+  res.cookie('sessionId', session._id, cookieOptions);
 };
 
 export const signupController = async (req, res) => {
