@@ -18,7 +18,6 @@ import { env } from '../utils/env.js';
 
 const setupSession = (res, session) => {
   const maxAge = session.refreshTokenValidUntil - Date.now();
-
   const isProduction = env('NODE_ENV', 'development') === 'production';
 
   const cookieOptions = {
