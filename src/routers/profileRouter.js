@@ -11,38 +11,26 @@ import { filterUsersController } from '../contacts/filterController.js';
 const profileRouter = Router();
 
 profileRouter.get('/filter', ctrlWrapper(filterUsersController));
-
 profileRouter.get(
   '/all',
   ctrlWrapper(profileController.getAllProfilesController),
 );
 
-// Все руты требуют авторизации
 profileRouter.use(authenticate);
-
-profileRouter.get(
-  '/me',
-  authenticate,
-  ctrlWrapper(profileController.getProfileController),
-);
-
-// Обновить свой профиль
+profileRouter.get('/me', ctrlWrapper(profileController.getProfileController));
 profileRouter.patch(
   '/',
   validateBody(userUpdateProfileSchema),
   ctrlWrapper(profileController.updateProfileController),
 );
-
-// Получить профиль любого пользователя по ID
-profileRouter.get(
-  '/:id',
-  ctrlWrapper(profileController.getProfileByIdController),
-);
-
 profileRouter.post(
   '/upload-photo',
   upload.single('photo'),
   ctrlWrapper(mediaController.uploadProfilePhotoController),
 );
 
+profileRouter.get(
+  '/:id',
+  ctrlWrapper(profileController.getProfileByIdController),
+);
 export default profileRouter;
