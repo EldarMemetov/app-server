@@ -6,43 +6,23 @@ import * as profileController from '../contacts/profileController.js';
 import { userUpdateProfileSchema } from '../validation/users.js';
 import upload from '../middlewares/uploadMiddleware.js';
 import * as mediaController from '../contacts/profileMediaController.js';
-import { filterUsersController } from '../contacts/filterController.js';
 
-const profileRouter = Router();
+const router = Router();
 
-profileRouter.get('/filter', ctrlWrapper(filterUsersController));
+router.use(authenticate);
 
-profileRouter.get(
-  '/all',
-  ctrlWrapper(profileController.getAllProfilesController),
-);
+router.get('/me', ctrlWrapper(profileController.getProfileController));
 
-// Все руты требуют авторизации
-profileRouter.use(authenticate);
-
-profileRouter.get(
-  '/me',
-  authenticate,
-  ctrlWrapper(profileController.getProfileController),
-);
-
-// Обновить свой профиль
-profileRouter.patch(
+router.patch(
   '/',
   validateBody(userUpdateProfileSchema),
   ctrlWrapper(profileController.updateProfileController),
 );
 
-// Получить профиль любого пользователя по ID
-profileRouter.get(
-  '/:id',
-  ctrlWrapper(profileController.getProfileByIdController),
-);
-
-profileRouter.post(
+router.post(
   '/upload-photo',
   upload.single('photo'),
   ctrlWrapper(mediaController.uploadProfilePhotoController),
 );
 
-export default profileRouter;
+export default router;

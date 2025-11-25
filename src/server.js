@@ -16,7 +16,7 @@ import portfolioRouter from './routers/portfolioRouter.js';
 import locationRouter from './routers/locationRouter.js';
 import corsOptions from './utils/corsOptions.js';
 import notificationsRouter from './routers/notificationsRouter.js';
-
+import profilePublicRouter from './routers/profilePublicRouter.js';
 export const setupServer = () => {
   const app = express();
 
@@ -38,6 +38,7 @@ export const setupServer = () => {
 
   app.use('/auth', authRouter);
   app.use('/profile', profileRouter);
+  app.use('/people', profilePublicRouter);
   app.use('/posts', postsRouter);
   app.use('/moderation', moderatorRouter);
   app.use('/portfolio', portfolioRouter);
