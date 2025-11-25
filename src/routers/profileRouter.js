@@ -10,26 +10,33 @@ import { filterUsersController } from '../contacts/filterController.js';
 
 const profileRouter = Router();
 
-// ПУБЛИЧНЫЕ РОУТЫ
 profileRouter.get('/filter', ctrlWrapper(filterUsersController));
+
 profileRouter.get(
   '/all',
   ctrlWrapper(profileController.getAllProfilesController),
 );
-profileRouter.get(
-  '/:id',
-  ctrlWrapper(profileController.getProfileByIdController),
-);
 
-//ТОЛЬКО ДЛЯ АВТОРИЗОВАННЫХ
+// Все руты требуют авторизации
 profileRouter.use(authenticate);
 
-profileRouter.get('/me', ctrlWrapper(profileController.getProfileController));
+profileRouter.get(
+  '/me',
+  authenticate,
+  ctrlWrapper(profileController.getProfileController),
+);
 
+// Обновить свой профиль
 profileRouter.patch(
   '/',
   validateBody(userUpdateProfileSchema),
   ctrlWrapper(profileController.updateProfileController),
+);
+
+// Получить профиль любого пользователя по ID
+profileRouter.get(
+  '/:id',
+  ctrlWrapper(profileController.getProfileByIdController),
 );
 
 profileRouter.post(
