@@ -82,7 +82,7 @@ postsRouter.delete(
   '/:postId/comments/:commentId',
   authenticate,
   checkBlocked,
-  postsController.deleteCommentController,
+  ctrlWrapper(postsController.deleteCommentController),
 );
 
 postsRouter.patch(
