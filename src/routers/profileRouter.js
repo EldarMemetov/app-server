@@ -6,31 +6,23 @@ import * as profileController from '../contacts/profileController.js';
 import { userUpdateProfileSchema } from '../validation/users.js';
 import upload from '../middlewares/uploadMiddleware.js';
 import * as mediaController from '../contacts/profileMediaController.js';
-import { filterUsersController } from '../contacts/filterController.js';
 
-const profileRouter = Router();
+const router = Router();
 
-profileRouter.get('/filter', ctrlWrapper(filterUsersController));
-profileRouter.get(
-  '/all',
-  ctrlWrapper(profileController.getAllProfilesController),
-);
+router.use(authenticate);
 
-profileRouter.use(authenticate);
-profileRouter.get('/me', ctrlWrapper(profileController.getProfileController));
-profileRouter.patch(
+router.get('/me', ctrlWrapper(profileController.getProfileController));
+
+router.patch(
   '/',
   validateBody(userUpdateProfileSchema),
   ctrlWrapper(profileController.updateProfileController),
 );
-profileRouter.post(
+
+router.post(
   '/upload-photo',
   upload.single('photo'),
   ctrlWrapper(mediaController.uploadProfilePhotoController),
 );
 
-profileRouter.get(
-  '/:id',
-  ctrlWrapper(profileController.getProfileByIdController),
-);
-export default profileRouter;
+export default router;
