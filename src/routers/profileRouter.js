@@ -11,18 +11,27 @@ const router = Router();
 
 router.use(authenticate);
 
+// GET /profile/me
 router.get('/me', ctrlWrapper(profileController.getProfileController));
 
+// PATCH /profile
 router.patch(
   '/',
   validateBody(userUpdateProfileSchema),
   ctrlWrapper(profileController.updateProfileController),
 );
 
+// POST /profile/upload-photo
 router.post(
   '/upload-photo',
   upload.single('photo'),
   ctrlWrapper(mediaController.uploadProfilePhotoController),
+);
+
+// DELETE /profile/photo
+router.delete(
+  '/photo',
+  ctrlWrapper(mediaController.deleteProfilePhotoController),
 );
 
 export default router;

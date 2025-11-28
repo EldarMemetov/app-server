@@ -75,3 +75,26 @@ export const deletePortfolioItemController = async (req, res) => {
     message: 'Portfolio item deleted successfully',
   });
 };
+// === Удаление фото профиля ===
+export const deleteProfilePhotoController = async (req, res) => {
+  const { _id } = req.user;
+  const user = await UserCollection.findById(_id);
+
+  if (!user) return res.status(404).json({ message: 'User not found' });
+
+  // Удаляем с Cloudinary
+  if (user.photoPublicId) {
+    await deleteFromCloudinary(user.photoPublicId);
+  }
+
+  // Обнуляем фото в базе
+  user.photo = '';
+  user.photoPublicId = '';
+  await user.save();
+
+  res.status(200).json({
+    status: 200,
+    message: 'Profile photo deleted successfully',
+    data: { photo: user.photo },
+  });
+};
