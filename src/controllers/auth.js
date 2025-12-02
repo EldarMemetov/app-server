@@ -7,12 +7,16 @@ import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
 const setupSession = (res, session) => {
   res.cookie('refreshToken', session.refreshToken, {
     httpOnly: true,
-    expire: new Date(Date.now() + session.refreshTokenValidUntil),
+    expires: session.refreshTokenValidUntil,
+    secure: true,
+    sameSite: 'none',
   });
 
   res.cookie('sessionId', session._id, {
     httpOnly: true,
-    expire: new Date(Date.now() + session.refreshTokenValidUntil),
+    expires: session.refreshTokenValidUntil,
+    secure: true,
+    sameSite: 'none',
   });
 };
 
