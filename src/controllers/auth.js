@@ -20,21 +20,38 @@ import { env } from '../utils/env.js';
 //   res.cookie('refreshToken', session.refreshToken, cookieOptions);
 //   res.cookie('sessionId', session._id, cookieOptions);
 // };
+const buildCookieOptions = (isProduction, maxAge) => ({
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: isProduction ? 'none' : 'lax',
+  path: '/',
+  maxAge: Math.max(0, maxAge),
+});
 
 const setupSession = (res, session) => {
-  const maxAge = session.refreshTokenValidUntil - Date.now();
+  const maxAge =
+    new Date(session.refreshTokenValidUntil).getTime() - Date.now();
   const isProduction = env('NODE_ENV', 'development') === 'production';
+  const cookieOptions = buildCookieOptions(isProduction, maxAge);
 
-  const cookieOptions = {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'none' : 'lax',
-    path: '/',
-    maxAge,
-  };
-
-  res.cookie('refreshToken', String(session.refreshToken), cookieOptions);
+  res.cookie('refreshToken', session.refreshToken, cookieOptions);
   res.cookie('sessionId', String(session._id), cookieOptions);
+};
+
+export const signoutController = async (req, res) => {
+  const { sessionId } = req.cookies;
+
+  if (sessionId) {
+    await authServices.signout(sessionId);
+  }
+
+  const isProduction = env('NODE_ENV', 'development') === 'production';
+  const cookieOptions = buildCookieOptions(isProduction, 0);
+
+  res.clearCookie('sessionId', cookieOptions);
+  res.clearCookie('refreshToken', cookieOptions);
+
+  res.status(204).send();
 };
 
 export const signupController = async (req, res) => {
@@ -86,41 +103,41 @@ export const refreshController = async (req, res) => {
   });
 };
 
-export const signoutController = async (req, res) => {
-  const { sessionId } = req.cookies;
+// export const signoutController = async (req, res) => {
+//   const { sessionId } = req.cookies;
 
-  if (sessionId) {
-    await authServices.signout(sessionId);
-  }
+//   if (sessionId) {
+//     await authServices.signout(sessionId);
+//   }
 
-  res.clearCookie('sessionId');
-  res.clearCookie('refreshToken');
+//   res.clearCookie('sessionId');
+//   res.clearCookie('refreshToken');
 
-  res.status(204).send();
-};
+//   res.status(204).send();
+// };
 
-export const requestResetEmailController = async (req, res) => {
-  const { email } = req.body;
+// export const requestResetEmailController = async (req, res) => {
+//   const { email } = req.body;
 
-  try {
-    await authServices.requestResetToken(email);
+//   try {
+//     await authServices.requestResetToken(email);
 
-    res.json({
-      status: 200,
-      message: 'Reset password email has been successfully sent.',
-      data: {},
-    });
-  } catch (error) {
-    if (error.status) {
-      res.status(error.status).json({ message: error.message });
-    } else {
-      console.error('Error sending email:', error);
-      res.status(500).json({
-        message: 'Failed to send the email, please try again later.',
-      });
-    }
-  }
-};
+//     res.json({
+//       status: 200,
+//       message: 'Reset password email has been successfully sent.',
+//       data: {},
+//     });
+//   } catch (error) {
+//     if (error.status) {
+//       res.status(error.status).json({ message: error.message });
+//     } else {
+//       console.error('Error sending email:', error);
+//       res.status(500).json({
+//         message: 'Failed to send the email, please try again later.',
+//       });
+//     }
+//   }
+// };
 
 export const resetPasswordController = async (req, res) => {
   await resetPassword(req.body);
