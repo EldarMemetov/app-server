@@ -51,29 +51,6 @@ export const signup = async (payload) => {
   return data._doc;
 };
 
-// export const signin = async (payload) => {
-//   const { email, password } = payload;
-//   const user = await UserCollection.findOne({ email });
-//   if (!user) {
-//     throw createHttpError(401, 'Email or password invalid');
-//   }
-
-//   await SessionCollection.deleteOne({ userId: user._id });
-
-//   const passwordCompare = await bcrypt.compare(password, user.password);
-//   if (!passwordCompare) {
-//     throw createHttpError(401, 'Email or password invalid ');
-//   }
-//   const sessionData = createSession();
-
-//   const userSession = await SessionCollection.create({
-//     userId: user._id,
-//     ...sessionData,
-//   });
-
-//   return userSession;
-// };
-
 export const signin = async (payload) => {
   const { email, password } = payload;
   const user = await UserCollection.findOne({ email });
@@ -81,13 +58,12 @@ export const signin = async (payload) => {
     throw createHttpError(401, 'Email or password invalid');
   }
 
-  const passwordCompare = await bcrypt.compare(password, user.password);
-  if (!passwordCompare) {
-    throw createHttpError(401, 'Email or password invalid');
-  }
-
   await SessionCollection.deleteOne({ userId: user._id });
 
+  const passwordCompare = await bcrypt.compare(password, user.password);
+  if (!passwordCompare) {
+    throw createHttpError(401, 'Email or password invalid ');
+  }
   const sessionData = createSession();
 
   const userSession = await SessionCollection.create({
@@ -128,61 +104,28 @@ export const signinOrSignupWitGoogleOAuth = async (code) => {
 export const findSessionByAccessToken = (accessToken) =>
   SessionCollection.findOne({ accessToken });
 
-// export const refreshSession = async ({ refreshToken, sessionId }) => {
-//   const oldSession = await SessionCollection.findOne({
-//     _id: sessionId,
-//     refreshToken,
-//   });
-//   if (!oldSession) {
-//     throw createHttpError(401, 'Session not found');
-//   }
-//   if (new Date() > oldSession.refreshTokenValidUntil) {
-//     throw createHttpError(401, 'Session token expired');
-//   }
-
-//   await SessionCollection.deleteOne({ _id: sessionId });
-
-//   const sessionData = createSession();
-
-//   const userSession = await SessionCollection.create({
-//     userId: oldSession.userId,
-//     ...sessionData,
-//   });
-
-//   return userSession;
-// };
-
 export const refreshSession = async ({ refreshToken, sessionId }) => {
   const oldSession = await SessionCollection.findOne({
     _id: sessionId,
     refreshToken,
   });
   if (!oldSession) {
-    console.log('refreshSession: session not found', {
-      sessionId,
-      refreshTokenExists: !!refreshToken,
-    });
     throw createHttpError(401, 'Session not found');
   }
   if (new Date() > oldSession.refreshTokenValidUntil) {
-    console.log('refreshSession: refresh token expired', { sessionId });
     throw createHttpError(401, 'Session token expired');
   }
 
+  await SessionCollection.deleteOne({ _id: sessionId });
+
   const sessionData = createSession();
 
-  const updatedSession = await SessionCollection.findByIdAndUpdate(
-    sessionId,
-    {
-      accessToken: sessionData.accessToken,
-      refreshToken: sessionData.refreshToken,
-      accessTokenValidUntil: sessionData.accessTokenValidUntil,
-      refreshTokenValidUntil: sessionData.refreshTokenValidUntil,
-    },
-    { new: true },
-  );
+  const userSession = await SessionCollection.create({
+    userId: oldSession.userId,
+    ...sessionData,
+  });
 
-  return updatedSession;
+  return userSession;
 };
 
 export const signout = async (sessionId) => {
