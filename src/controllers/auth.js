@@ -5,6 +5,22 @@ import { signup } from '../contacts/auth.js';
 import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
 import { env } from '../utils/env.js';
 
+// const setupSession = (res, session) => {
+//   const maxAge = session.refreshTokenValidUntil - Date.now();
+//   const isProduction = env('NODE_ENV', 'development') === 'production';
+
+//   const cookieOptions = {
+//     httpOnly: true,
+//     secure: isProduction,
+//     sameSite: isProduction ? 'none' : 'lax',
+//     path: '/',
+//     maxAge,
+//   };
+
+//   res.cookie('refreshToken', session.refreshToken, cookieOptions);
+//   res.cookie('sessionId', session._id, cookieOptions);
+// };
+
 const setupSession = (res, session) => {
   const maxAge = session.refreshTokenValidUntil - Date.now();
   const isProduction = env('NODE_ENV', 'development') === 'production';
@@ -17,8 +33,8 @@ const setupSession = (res, session) => {
     maxAge,
   };
 
-  res.cookie('refreshToken', session.refreshToken, cookieOptions);
-  res.cookie('sessionId', session._id, cookieOptions);
+  res.cookie('refreshToken', String(session.refreshToken), cookieOptions);
+  res.cookie('sessionId', String(session._id), cookieOptions);
 };
 
 export const signupController = async (req, res) => {
