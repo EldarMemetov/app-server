@@ -10,6 +10,7 @@ const setupSession = (res, session) => {
     expires: session.refreshTokenValidUntil,
     secure: true,
     sameSite: 'none',
+    path: '/',
   });
 
   res.cookie('sessionId', session._id, {
@@ -17,6 +18,7 @@ const setupSession = (res, session) => {
     expires: session.refreshTokenValidUntil,
     secure: true,
     sameSite: 'none',
+    path: '/',
   });
 };
 
@@ -37,6 +39,19 @@ export const signupController = async (req, res) => {
   });
 };
 
+// export const signinController = async (req, res) => {
+//   const session = await authServices.signin(req.body);
+
+//   setupSession(res, session);
+
+//   res.json({
+//     status: 200,
+//     message: 'Successfully signin',
+//     data: {
+//       accessToken: session.accessToken,
+//     },
+//   });
+// };
 export const signinController = async (req, res) => {
   const session = await authServices.signin(req.body);
 
@@ -47,10 +62,27 @@ export const signinController = async (req, res) => {
     message: 'Successfully signin',
     data: {
       accessToken: session.accessToken,
+      expiresAt: session.accessTokenValidUntil.getTime(),
     },
   });
 };
+// export const refreshController = async (req, res) => {
+//   const { refreshToken, sessionId } = req.cookies;
+//   const session = await authServices.refreshSession({
+//     refreshToken,
+//     sessionId,
+//   });
 
+//   setupSession(res, session);
+
+//   res.json({
+//     status: 200,
+//     message: 'Successfully refresh session',
+//     data: {
+//       accessToken: session.accessToken,
+//     },
+//   });
+// };
 export const refreshController = async (req, res) => {
   const { refreshToken, sessionId } = req.cookies;
   const session = await authServices.refreshSession({
@@ -65,10 +97,22 @@ export const refreshController = async (req, res) => {
     message: 'Successfully refresh session',
     data: {
       accessToken: session.accessToken,
+      expiresAt: session.accessTokenValidUntil.getTime(),
     },
   });
 };
+// export const signoutController = async (req, res) => {
+//   const { sessionId } = req.cookies;
 
+//   if (sessionId) {
+//     await authServices.signout(sessionId);
+//   }
+
+//   res.clearCookie('sessionId');
+//   res.clearCookie('refreshToken');
+
+//   res.status(204).send();
+// };
 export const signoutController = async (req, res) => {
   const { sessionId } = req.cookies;
 
@@ -76,8 +120,17 @@ export const signoutController = async (req, res) => {
     await authServices.signout(sessionId);
   }
 
-  res.clearCookie('sessionId');
-  res.clearCookie('refreshToken');
+  res.clearCookie('sessionId', {
+    path: '/',
+    sameSite: 'none',
+    secure: true,
+  });
+
+  res.clearCookie('refreshToken', {
+    path: '/',
+    sameSite: 'none',
+    secure: true,
+  });
 
   res.status(204).send();
 };
