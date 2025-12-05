@@ -4,20 +4,39 @@ import { generateGoogleOAuthUrl } from '../utils/googleOAuth.js';
 import { signup } from '../contacts/auth.js';
 import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
 
+// const setupSession = (res, session) => {
+//   res.cookie('refreshToken', session.refreshToken, {
+//     httpOnly: true,
+//     expires: session.refreshTokenValidUntil,
+//     secure: true,
+//     sameSite: 'none',
+//     path: '/',
+//   });
+
+//   res.cookie('sessionId', session._id, {
+//     httpOnly: true,
+//     expires: session.refreshTokenValidUntil,
+//     secure: true,
+//     sameSite: 'none',
+//     path: '/',
+//   });
+// };
+const isProd = process.env.NODE_ENV === 'production';
+
 const setupSession = (res, session) => {
   res.cookie('refreshToken', session.refreshToken, {
     httpOnly: true,
     expires: session.refreshTokenValidUntil,
-    secure: true,
-    sameSite: 'none',
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
     path: '/',
   });
 
-  res.cookie('sessionId', session._id, {
+  res.cookie('sessionId', session._id.toString(), {
     httpOnly: true,
     expires: session.refreshTokenValidUntil,
-    secure: true,
-    sameSite: 'none',
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
     path: '/',
   });
 };
@@ -120,16 +139,18 @@ export const signoutController = async (req, res) => {
     await authServices.signout(sessionId);
   }
 
+  const isProd = process.env.NODE_ENV === 'production';
+
   res.clearCookie('sessionId', {
     path: '/',
-    sameSite: 'none',
-    secure: true,
+    sameSite: isProd ? 'none' : 'lax',
+    secure: isProd,
   });
 
   res.clearCookie('refreshToken', {
     path: '/',
-    sameSite: 'none',
-    secure: true,
+    sameSite: isProd ? 'none' : 'lax',
+    secure: isProd,
   });
 
   res.status(204).send();

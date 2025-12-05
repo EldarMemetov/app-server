@@ -4,7 +4,7 @@ import { randomBytes } from 'crypto';
 import createHttpError from 'http-errors';
 import UserCollection from '../db/models/User.js';
 import SessionCollection from '../db/models/Session.js';
-
+import { hashToken } from '../utils/hashToken.js';
 import jwt from 'jsonwebtoken';
 import { TEMPLATES_DIR } from '../constants/index.js';
 import { env } from '../utils/env.js';
@@ -51,6 +51,29 @@ export const signup = async (payload) => {
   return data._doc;
 };
 
+// export const signin = async (payload) => {
+//   const { email, password } = payload;
+//   const user = await UserCollection.findOne({ email });
+//   if (!user) {
+//     throw createHttpError(401, 'Email or password invalid');
+//   }
+
+//   await SessionCollection.deleteOne({ userId: user._id });
+
+//   const passwordCompare = await bcrypt.compare(password, user.password);
+//   if (!passwordCompare) {
+//     throw createHttpError(401, 'Email or password invalid ');
+//   }
+//   const sessionData = createSession();
+
+//   const userSession = await SessionCollection.create({
+//     userId: user._id,
+//     ...sessionData,
+//   });
+
+//   return userSession;
+// };
+
 export const signin = async (payload) => {
   const { email, password } = payload;
   const user = await UserCollection.findOne({ email });
@@ -58,22 +81,59 @@ export const signin = async (payload) => {
     throw createHttpError(401, 'Email or password invalid');
   }
 
-  await SessionCollection.deleteOne({ userId: user._id });
-
   const passwordCompare = await bcrypt.compare(password, user.password);
   if (!passwordCompare) {
-    throw createHttpError(401, 'Email or password invalid ');
+    throw createHttpError(401, 'Email or password invalid');
   }
+
+  await SessionCollection.deleteMany({ userId: user._id });
+
   const sessionData = createSession();
 
-  const userSession = await SessionCollection.create({
+  const sessionDoc = await SessionCollection.create({
     userId: user._id,
-    ...sessionData,
+    accessToken: sessionData.accessToken,
+    refreshToken: hashToken(sessionData.refreshToken), // хэш
+    accessTokenValidUntil: sessionData.accessTokenValidUntil,
+    refreshTokenValidUntil: sessionData.refreshTokenValidUntil,
   });
 
-  return userSession;
+  return {
+    ...sessionDoc.toObject(),
+
+    refreshToken: sessionData.refreshToken,
+    accessToken: sessionData.accessToken,
+    accessTokenValidUntil: sessionData.accessTokenValidUntil,
+    refreshTokenValidUntil: sessionData.refreshTokenValidUntil,
+  };
 };
 
+// export const signinOrSignupWitGoogleOAuth = async (code) => {
+//   const loginTicket = await validateCode(code);
+//   const payload = loginTicket.getPayload();
+
+//   let user = await UserCollection.findOne({ email: payload.email });
+//   if (!user) {
+//     const password = randomBytes(10);
+//     const hashPassword = await bcrypt.hash(password, 10);
+//     user = await UserCollection.create({
+//       email: payload.email,
+//       name: payload.name,
+//       password: hashPassword,
+//       verify: true,
+//     });
+//     delete user._doc.password;
+//   }
+
+//   const sessionData = createSession();
+
+//   const userSession = await SessionCollection.create({
+//     userId: user._id,
+//     ...sessionData,
+//   });
+
+//   return userSession;
+// };
 export const signinOrSignupWitGoogleOAuth = async (code) => {
   const loginTicket = await validateCode(code);
   const payload = loginTicket.getPayload();
@@ -93,39 +153,93 @@ export const signinOrSignupWitGoogleOAuth = async (code) => {
 
   const sessionData = createSession();
 
-  const userSession = await SessionCollection.create({
+  const sessionDoc = await SessionCollection.create({
     userId: user._id,
-    ...sessionData,
+    accessToken: sessionData.accessToken,
+    refreshToken: hashToken(sessionData.refreshToken),
+    accessTokenValidUntil: sessionData.accessTokenValidUntil,
+    refreshTokenValidUntil: sessionData.refreshTokenValidUntil,
   });
 
-  return userSession;
+  return {
+    ...sessionDoc.toObject(),
+    refreshToken: sessionData.refreshToken,
+    accessToken: sessionData.accessToken,
+    accessTokenValidUntil: sessionData.accessTokenValidUntil,
+    refreshTokenValidUntil: sessionData.refreshTokenValidUntil,
+  };
 };
 
 export const findSessionByAccessToken = (accessToken) =>
   SessionCollection.findOne({ accessToken });
 
+// export const refreshSession = async ({ refreshToken, sessionId }) => {
+//   const oldSession = await SessionCollection.findOne({
+//     _id: sessionId,
+//     refreshToken,
+//   });
+//   if (!oldSession) {
+//     throw createHttpError(401, 'Session not found');
+//   }
+//   if (new Date() > oldSession.refreshTokenValidUntil) {
+//     throw createHttpError(401, 'Session token expired');
+//   }
+
+//   await SessionCollection.deleteOne({ _id: sessionId });
+
+//   const sessionData = createSession();
+
+//   const userSession = await SessionCollection.create({
+//     userId: oldSession.userId,
+//     ...sessionData,
+//   });
+
+//   return userSession;
+// };
+
 export const refreshSession = async ({ refreshToken, sessionId }) => {
-  const oldSession = await SessionCollection.findOne({
-    _id: sessionId,
-    refreshToken,
-  });
-  if (!oldSession) {
+  if (!refreshToken || !sessionId) {
     throw createHttpError(401, 'Session not found');
   }
+
+  const refreshTokenHash = hashToken(refreshToken);
+
+  let oldSession = await SessionCollection.findOneAndDelete({
+    _id: sessionId,
+    refreshToken: refreshTokenHash,
+  });
+
+  if (!oldSession) {
+    oldSession = await SessionCollection.findOneAndDelete({
+      _id: sessionId,
+      refreshToken,
+    });
+    if (!oldSession) {
+      throw createHttpError(401, 'Session not found or token reused');
+    }
+  }
+
   if (new Date() > oldSession.refreshTokenValidUntil) {
     throw createHttpError(401, 'Session token expired');
   }
 
-  await SessionCollection.deleteOne({ _id: sessionId });
-
   const sessionData = createSession();
 
-  const userSession = await SessionCollection.create({
+  const newSessionDoc = await SessionCollection.create({
     userId: oldSession.userId,
-    ...sessionData,
+    accessToken: sessionData.accessToken,
+    refreshToken: hashToken(sessionData.refreshToken),
+    accessTokenValidUntil: sessionData.accessTokenValidUntil,
+    refreshTokenValidUntil: sessionData.refreshTokenValidUntil,
   });
 
-  return userSession;
+  return {
+    ...newSessionDoc.toObject(),
+    refreshToken: sessionData.refreshToken,
+    accessToken: sessionData.accessToken,
+    accessTokenValidUntil: sessionData.accessTokenValidUntil,
+    refreshTokenValidUntil: sessionData.refreshTokenValidUntil,
+  };
 };
 
 export const signout = async (sessionId) => {
