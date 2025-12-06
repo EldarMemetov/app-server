@@ -46,18 +46,5 @@ authRouter.post(
   validateBody(userLoginWithGoogleOAuthSchema),
   ctrlWrapper(authControllers.userLoginWithGoogleOAuthControllers),
 );
-import authenticate from '../middlewares/authenticate.js';
-
-authRouter.get(
-  '/sessions',
-  authenticate,
-  ctrlWrapper(authControllers.getSessionsController),
-);
-
-authRouter.delete(
-  '/sessions/:id',
-  authenticate,
-  ctrlWrapper(authControllers.revokeSessionController),
-);
 
 export default authRouter;

@@ -1,41 +1,3 @@
-// import createHttpError from 'http-errors';
-
-// import * as authServices from '../contacts/auth.js';
-
-// const authenticate = async (req, res, next) => {
-//   const authorization = req.get('Authorization');
-
-//   if (!authorization) {
-//     return next(createHttpError(401, 'Authorization header not found'));
-//   }
-
-//   const [bearer, token] = authorization.split(' ');
-//   if (bearer !== 'Bearer') {
-//     return next(createHttpError(401, 'Authorization must have Bearer type'));
-//   }
-
-//   const session = await authServices.findSessionByAccessToken(token);
-
-//   if (!session) {
-//     return next(createHttpError(401, 'Session not found'));
-//   }
-//   if (new Date() > session.accessTokenValidUntil) {
-//     return next(createHttpError(401, 'Access token expired'));
-//   }
-
-//   const user = await authServices.findUser({ _id: session.userId });
-//   if (!user) {
-//     return next(createHttpError(401, 'User not found'));
-//   }
-//   if (user.isBlocked) {
-//     return next(createHttpError(403, 'User is blocked'));
-//   }
-//   req.user = user;
-
-//   next();
-// };
-
-// export default authenticate;
 import createHttpError from 'http-errors';
 
 import * as authServices from '../contacts/auth.js';
@@ -57,11 +19,6 @@ const authenticate = async (req, res, next) => {
   if (!session) {
     return next(createHttpError(401, 'Session not found'));
   }
-
-  if (session.revoked) {
-    return next(createHttpError(401, 'Session revoked'));
-  }
-
   if (new Date() > session.accessTokenValidUntil) {
     return next(createHttpError(401, 'Access token expired'));
   }
