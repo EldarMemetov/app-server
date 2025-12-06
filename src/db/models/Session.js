@@ -1,3 +1,43 @@
+// import { Schema, model } from 'mongoose';
+
+// import { handleSaveError, setupUpdateOptions } from './hooks.js';
+
+// export const sessionSchema = new Schema(
+//   {
+//     userId: {
+//       type: Schema.Types.ObjectId,
+//       ref: 'user',
+//       required: true,
+//     },
+//     accessToken: {
+//       type: String,
+//       required: true,
+//     },
+//     refreshToken: {
+//       type: String,
+//       required: true,
+//     },
+//     accessTokenValidUntil: {
+//       type: Date,
+//       required: true,
+//     },
+//     refreshTokenValidUntil: {
+//       type: Date,
+//       required: true,
+//     },
+//   },
+//   { versionKey: false, timestamps: true },
+// );
+
+// sessionSchema.post('save', handleSaveError);
+
+// sessionSchema.pre('findOneAndUpdate', setupUpdateOptions);
+
+// sessionSchema.post('findOneAndUpdate', handleSaveError);
+
+// const SessionCollection = model('session', sessionSchema);
+
+// export default SessionCollection;
 import { Schema, model } from 'mongoose';
 
 import { handleSaveError, setupUpdateOptions } from './hooks.js';
@@ -9,31 +49,27 @@ export const sessionSchema = new Schema(
       ref: 'user',
       required: true,
     },
-    accessToken: {
-      type: String,
-      required: true,
-    },
-    refreshToken: {
-      type: String,
-      required: true,
-    },
-    accessTokenValidUntil: {
-      type: Date,
-      required: true,
-    },
-    refreshTokenValidUntil: {
-      type: Date,
-      required: true,
-    },
+
+    accessToken: { type: String, required: true },
+    refreshToken: { type: String, required: true },
+
+    accessTokenValidUntil: { type: Date, required: true },
+    refreshTokenValidUntil: { type: Date, required: true },
+
+    ip: { type: String },
+    userAgent: { type: String },
+    device: { type: String },
+    revoked: { type: Boolean, default: false },
   },
   { versionKey: false, timestamps: true },
 );
 
 sessionSchema.post('save', handleSaveError);
-
 sessionSchema.pre('findOneAndUpdate', setupUpdateOptions);
-
 sessionSchema.post('findOneAndUpdate', handleSaveError);
+
+sessionSchema.index({ accessToken: 1 });
+sessionSchema.index({ refreshToken: 1 });
 
 const SessionCollection = model('session', sessionSchema);
 

@@ -3,6 +3,8 @@ import { resetPassword } from '../contacts/auth.js';
 import { generateGoogleOAuthUrl } from '../utils/googleOAuth.js';
 import { signup } from '../contacts/auth.js';
 import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
+import SessionCollection from '../db/models/Session.js';
+import createHttpError from 'http-errors';
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -41,8 +43,28 @@ export const signupController = async (req, res) => {
   });
 };
 
+// export const signinController = async (req, res) => {
+//   const session = await authServices.signin(req.body);
+
+//   setupSession(res, session);
+
+//   res.json({
+//     status: 200,
+//     message: 'Successfully signin',
+//     data: {
+//       accessToken: session.accessToken,
+//       expiresAt: session.accessTokenValidUntil.getTime(),
+//     },
+//   });
+// };
 export const signinController = async (req, res) => {
-  const session = await authServices.signin(req.body);
+  const meta = {
+    ip: req.ip,
+    userAgent: req.get('User-Agent'),
+    device: req.body.deviceName || '',
+  };
+
+  const session = await authServices.signin(req.body, meta);
 
   setupSession(res, session);
 
@@ -156,4 +178,32 @@ export const userLoginWithGoogleOAuthControllers = async (req, res) => {
       accessToken: session.accessToken,
     },
   });
+};
+export const getSessionsController = async (req, res) => {
+  const sessions = await SessionCollection.find({
+    userId: req.user._id,
+    revoked: { $ne: true },
+  }).select('-refreshToken');
+
+  res.json({
+    status: 200,
+    message: 'Sessions loaded',
+    data: sessions,
+  });
+};
+
+export const revokeSessionController = async (req, res) => {
+  const { id } = req.params;
+
+  const session = await SessionCollection.findOne({
+    _id: id,
+    userId: req.user._id,
+  });
+
+  if (!session) throw createHttpError(404, 'Session not found');
+
+  session.revoked = true;
+  await session.save();
+
+  res.json({ status: 200, message: 'Session revoked' });
 };

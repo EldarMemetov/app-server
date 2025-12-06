@@ -9,7 +9,7 @@ import {
 import { requestResetEmailSchema } from '../validation/mail.js';
 
 import { resetPasswordSchema } from '../validation/auth.js';
-
+import authenticate from '../middlewares/authenticate.js';
 const authRouter = Router();
 
 authRouter.post('/register', ctrlWrapper(authControllers.signupController));
@@ -46,5 +46,15 @@ authRouter.post(
   validateBody(userLoginWithGoogleOAuthSchema),
   ctrlWrapper(authControllers.userLoginWithGoogleOAuthControllers),
 );
+authRouter.get(
+  '/sessions',
+  authenticate,
+  ctrlWrapper(authControllers.getSessionsController),
+);
 
+authRouter.delete(
+  '/sessions/:id',
+  authenticate,
+  ctrlWrapper(authControllers.revokeSessionController),
+);
 export default authRouter;
