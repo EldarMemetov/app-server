@@ -1,5 +1,22 @@
 import Joi from 'joi';
 import { emailRegexp } from '../constants/users.js';
+const rolesEnum = [
+  'model',
+  'photographer',
+  'videographer',
+  'designer',
+  'producer',
+  'director',
+  'editor',
+  'retoucher',
+  'business',
+  'host',
+  'dj',
+  'fashionOwner',
+  'stylist',
+  'lighting',
+  'soundEngineer',
+];
 
 export const userSignupSchema = Joi.object({
   name: Joi.string().min(2).max(50).required(),
@@ -8,24 +25,10 @@ export const userSignupSchema = Joi.object({
   city: Joi.string().min(2).max(50).required(),
   photo: Joi.string().uri(),
   email: Joi.string().pattern(emailRegexp).required(),
-  role: Joi.string()
-    .valid(
-      'model',
-      'photographer',
-      'videographer',
-      'designer',
-      'producer',
-      'director',
-      'editor',
-      'retoucher',
-      'business',
-      'host',
-      'dj',
-      'fashionOwner',
-      'stylist',
-      'lighting',
-      'soundEngineer',
-    )
+  roles: Joi.array()
+    .items(Joi.string().valid(...rolesEnum))
+    .min(1)
+    .max(3)
     .required(),
   password: Joi.string().min(6).max(128).required(),
 });
@@ -47,6 +50,10 @@ export const userUpdateProfileSchema = Joi.object({
   photo: Joi.string().uri(),
   aboutMe: Joi.string().max(500),
   experience: Joi.string().max(500),
+  roles: Joi.array()
+    .items(Joi.string().valid(...rolesEnum))
+    .min(1)
+    .max(3),
   directions: Joi.array().items(Joi.string()),
   onlineStatus: Joi.boolean(),
   portfolio: Joi.array().items(

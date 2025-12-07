@@ -10,8 +10,8 @@ const userSchema = new Schema(
     city: { type: String, required: true },
     photo: { type: String },
 
-    role: {
-      type: String,
+    roles: {
+      type: [String],
       required: true,
       enum: [
         'model',
@@ -30,6 +30,11 @@ const userSchema = new Schema(
         'lighting',
         'soundEngineer',
       ],
+      validate: {
+        validator: (arr) =>
+          Array.isArray(arr) && arr.length >= 1 && arr.length <= 3,
+        message: 'User must have between 1 and 3 roles',
+      },
     },
 
     accessRole: {

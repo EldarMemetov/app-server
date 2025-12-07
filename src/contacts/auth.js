@@ -51,66 +51,37 @@ export const signup = async (payload) => {
   return data._doc;
 };
 
-// export const signin = async (payload) => {
-//   const { email, password } = payload;
-//   const user = await UserCollection.findOne({ email });
-//   if (!user) {
-//     throw createHttpError(401, 'Email or password invalid');
-//   }
-
-//   const passwordCompare = await bcrypt.compare(password, user.password);
-//   if (!passwordCompare) {
-//     throw createHttpError(401, 'Email or password invalid');
-//   }
-
-//   await SessionCollection.deleteMany({ userId: user._id });
-
-//   const sessionData = createSession();
-
-//   const sessionDoc = await SessionCollection.create({
-//     userId: user._id,
-//     accessToken: sessionData.accessToken,
-//     refreshToken: hashToken(sessionData.refreshToken),
-//     accessTokenValidUntil: sessionData.accessTokenValidUntil,
-//     refreshTokenValidUntil: sessionData.refreshTokenValidUntil,
-//   });
-
-//   return {
-//     ...sessionDoc.toObject(),
-
-//     refreshToken: sessionData.refreshToken,
-//     accessToken: sessionData.accessToken,
-//     accessTokenValidUntil: sessionData.accessTokenValidUntil,
-//     refreshTokenValidUntil: sessionData.refreshTokenValidUntil,
-//   };
-// };
-export const signin = async (payload, meta = {}) => {
+export const signin = async (payload) => {
   const { email, password } = payload;
-
   const user = await UserCollection.findOne({ email });
-  if (!user) throw createHttpError(401, 'Email or password invalid');
+  if (!user) {
+    throw createHttpError(401, 'Email or password invalid');
+  }
 
   const passwordCompare = await bcrypt.compare(password, user.password);
-  if (!passwordCompare) throw createHttpError(401, 'Email or password invalid');
+  if (!passwordCompare) {
+    throw createHttpError(401, 'Email or password invalid');
+  }
+
+  await SessionCollection.deleteMany({ userId: user._id });
 
   const sessionData = createSession();
 
   const sessionDoc = await SessionCollection.create({
     userId: user._id,
     accessToken: sessionData.accessToken,
-    refreshToken: hashToken(sessionData.refreshToken),
+    refreshToken: hashToken(sessionData.refreshToken), // хэш
     accessTokenValidUntil: sessionData.accessTokenValidUntil,
     refreshTokenValidUntil: sessionData.refreshTokenValidUntil,
-
-    ip: meta.ip,
-    userAgent: meta.userAgent,
-    device: meta.device,
   });
 
   return {
     ...sessionDoc.toObject(),
+
     refreshToken: sessionData.refreshToken,
     accessToken: sessionData.accessToken,
+    accessTokenValidUntil: sessionData.accessTokenValidUntil,
+    refreshTokenValidUntil: sessionData.refreshTokenValidUntil,
   };
 };
 
@@ -151,52 +122,7 @@ export const signinOrSignupWitGoogleOAuth = async (code) => {
 };
 
 export const findSessionByAccessToken = (accessToken) =>
-  SessionCollection.findOne({ accessToken, revoked: { $ne: true } });
-
-// export const refreshSession = async ({ refreshToken, sessionId }) => {
-//   if (!refreshToken || !sessionId) {
-//     throw createHttpError(401, 'Session not found');
-//   }
-
-//   const refreshTokenHash = hashToken(refreshToken);
-
-//   let oldSession = await SessionCollection.findOneAndDelete({
-//     _id: sessionId,
-//     refreshToken: refreshTokenHash,
-//   });
-
-//   if (!oldSession) {
-//     oldSession = await SessionCollection.findOneAndDelete({
-//       _id: sessionId,
-//       refreshToken,
-//     });
-//     if (!oldSession) {
-//       throw createHttpError(401, 'Session not found or token reused');
-//     }
-//   }
-
-//   if (new Date() > oldSession.refreshTokenValidUntil) {
-//     throw createHttpError(401, 'Session token expired');
-//   }
-
-//   const sessionData = createSession();
-
-//   const newSessionDoc = await SessionCollection.create({
-//     userId: oldSession.userId,
-//     accessToken: sessionData.accessToken,
-//     refreshToken: hashToken(sessionData.refreshToken),
-//     accessTokenValidUntil: sessionData.accessTokenValidUntil,
-//     refreshTokenValidUntil: sessionData.refreshTokenValidUntil,
-//   });
-
-//   return {
-//     ...newSessionDoc.toObject(),
-//     refreshToken: sessionData.refreshToken,
-//     accessToken: sessionData.accessToken,
-//     accessTokenValidUntil: sessionData.accessTokenValidUntil,
-//     refreshTokenValidUntil: sessionData.refreshTokenValidUntil,
-//   };
-// };
+  SessionCollection.findOne({ accessToken });
 
 export const refreshSession = async ({ refreshToken, sessionId }) => {
   if (!refreshToken || !sessionId) {
@@ -205,14 +131,19 @@ export const refreshSession = async ({ refreshToken, sessionId }) => {
 
   const refreshTokenHash = hashToken(refreshToken);
 
-  const oldSession = await SessionCollection.findOneAndDelete({
+  let oldSession = await SessionCollection.findOneAndDelete({
     _id: sessionId,
     refreshToken: refreshTokenHash,
-    revoked: { $ne: true },
   });
 
   if (!oldSession) {
-    throw createHttpError(401, 'Session not found or token reused');
+    oldSession = await SessionCollection.findOneAndDelete({
+      _id: sessionId,
+      refreshToken,
+    });
+    if (!oldSession) {
+      throw createHttpError(401, 'Session not found or token reused');
+    }
   }
 
   if (new Date() > oldSession.refreshTokenValidUntil) {
@@ -227,16 +158,14 @@ export const refreshSession = async ({ refreshToken, sessionId }) => {
     refreshToken: hashToken(sessionData.refreshToken),
     accessTokenValidUntil: sessionData.accessTokenValidUntil,
     refreshTokenValidUntil: sessionData.refreshTokenValidUntil,
-
-    ip: oldSession.ip,
-    userAgent: oldSession.userAgent,
-    device: oldSession.device,
   });
 
   return {
     ...newSessionDoc.toObject(),
     refreshToken: sessionData.refreshToken,
     accessToken: sessionData.accessToken,
+    accessTokenValidUntil: sessionData.accessTokenValidUntil,
+    refreshTokenValidUntil: sessionData.refreshTokenValidUntil,
   };
 };
 
@@ -309,14 +238,4 @@ export const resetPassword = async (payload) => {
     { _id: user._id },
     { password: encryptedPassword },
   );
-};
-export const getSessionsForUser = (userId) =>
-  SessionCollection.find({ userId }).select('-refreshToken').lean();
-
-export const revokeSessionById = async (sessionId, userId) => {
-  const session = await SessionCollection.findOne({ _id: sessionId, userId });
-  if (!session) throw createHttpError(404, 'Session not found');
-  session.revoked = true;
-  await session.save();
-  return session;
 };
