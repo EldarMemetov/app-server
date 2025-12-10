@@ -49,6 +49,7 @@ export const filterUsersController = async (req, res) => {
     city,
     country,
     role,
+    directions,
     minRating,
     maxRating,
     page = 1,
@@ -59,7 +60,13 @@ export const filterUsersController = async (req, res) => {
 
   if (city) filter.city = city;
   if (country) filter.country = country;
-  if (role) filter.role = role;
+  if (role) filter.roles = { $in: [role] };
+  if (directions) {
+    const dirsArray = Array.isArray(directions)
+      ? directions
+      : directions.split(',');
+    filter.directions = { $in: dirsArray };
+  }
   if (minRating || maxRating) {
     filter.rating = {};
     if (minRating) filter.rating.$gte = Number(minRating);

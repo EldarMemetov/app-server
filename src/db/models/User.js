@@ -1,6 +1,8 @@
 import { Schema, model } from 'mongoose';
 import { emailRegexp } from '../../constants/users.js';
 import { handleSaveError, setupUpdateOptions } from './hooks.js';
+import { roles } from '../../constants/roles.js';
+import { directionsEnum } from '../../constants/rolesEnum.js';
 
 const userSchema = new Schema(
   {
@@ -13,23 +15,7 @@ const userSchema = new Schema(
     roles: {
       type: [String],
       required: true,
-      enum: [
-        'model',
-        'photographer',
-        'videographer',
-        'designer',
-        'producer',
-        'director',
-        'editor',
-        'retoucher',
-        'business',
-        'host',
-        'dj',
-        'fashionOwner',
-        'stylist',
-        'lighting',
-        'soundEngineer',
-      ],
+      enum: roles,
       validate: {
         validator: (arr) =>
           Array.isArray(arr) && arr.length >= 1 && arr.length <= 3,
@@ -48,7 +34,12 @@ const userSchema = new Schema(
 
     rating: { type: Number, default: 0 },
     experience: { type: String, default: '' },
-    directions: { type: [String], default: [] },
+    directions: {
+      type: [String],
+      enum: directionsEnum,
+      default: [],
+    },
+
     onlineStatus: { type: Boolean, default: false },
     aboutMe: { type: String, default: '' },
 
