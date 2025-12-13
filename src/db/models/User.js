@@ -40,7 +40,9 @@ const userSchema = new Schema(
       default: [],
     },
 
+    onlineConnections: { type: Number, default: 0 },
     onlineStatus: { type: Boolean, default: false },
+
     aboutMe: { type: String, default: '' },
 
     isBlocked: { type: Boolean, default: false },
