@@ -18,6 +18,8 @@ export const initSocket = (io) => {
         $set: { onlineStatus: true },
       });
 
+      io.emit('userStatusUpdate', { userId, onlineStatus: true });
+
       socket.on('disconnect', async () => {
         const updatedUser = await UserCollection.findByIdAndUpdate(
           userId,
@@ -25,12 +27,16 @@ export const initSocket = (io) => {
           { new: true },
         );
 
+        let status = true;
         if (!updatedUser || updatedUser.onlineConnections <= 0) {
           await UserCollection.findByIdAndUpdate(userId, {
             onlineConnections: 0,
             onlineStatus: false,
           });
+          status = false;
         }
+
+        io.emit('userStatusUpdate', { userId, onlineStatus: status });
       });
     } catch (err) {
       console.error('Socket error:', err);
