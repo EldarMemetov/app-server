@@ -51,7 +51,6 @@ import SessionCollection from '../db/models/Session.js';
 
 export const initSocket = (io) => {
   io.on('connection', async (socket) => {
-    // 1️⃣ СРАЗУ при входящем соединении
     console.log('[socket] incoming connection, socket.id =', socket.id);
 
     try {
@@ -70,16 +69,20 @@ export const initSocket = (io) => {
       const userId = session.userId.toString();
       socket.userId = userId;
 
-      // 2️⃣ ПОСЛЕ успешной валидации пользователя
       console.log('[socket] user connected', userId, 'socket=', socket.id);
 
       await UserCollection.findByIdAndUpdate(
         userId,
-        { $inc: { onlineConnections: 1 }, $set: { onlineStatus: true } },
+        {
+          $inc: { onlineConnections: 1 },
+          $set: { onlineStatus: true },
+        },
         { new: true },
       );
 
-      const onlineUsers = await UserCollection.find({ onlineStatus: true })
+      const onlineUsers = await UserCollection.find({
+        onlineConnections: { $gt: 0 },
+      })
         .select('_id')
         .lean();
 
@@ -89,6 +92,7 @@ export const initSocket = (io) => {
       }
 
       socket.emit('initialUsersStatus', onlineMap);
+
       io.emit('userStatusUpdate', { userId, onlineStatus: true });
 
       socket.on('disconnect', async (reason) => {
@@ -99,15 +103,13 @@ export const initSocket = (io) => {
             { new: true },
           );
 
-          let status = true;
-          if (!updatedUser || updatedUser.onlineConnections <= 0) {
-            await UserCollection.findByIdAndUpdate(userId, {
-              $set: { onlineConnections: 0, onlineStatus: false },
-            });
-            status = false;
-          }
+          const connections = Math.max(updatedUser?.onlineConnections ?? 0, 0);
+          const status = connections > 0;
 
-          // 3️⃣ ПРИ отключении
+          await UserCollection.findByIdAndUpdate(userId, {
+            $set: { onlineConnections: connections, onlineStatus: status },
+          });
+
           console.log(
             '[socket] user disconnected',
             userId,
