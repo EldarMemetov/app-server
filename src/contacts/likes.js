@@ -1,8 +1,19 @@
 // contacts/likes.js
-import LikeCollection from '../db/models/like.js';
+import LikeCollection from '../db/models/Like.js';
 import UserCollection from '../db/models/User.js';
 import createHttpError from 'http-errors';
 import mongoose from 'mongoose';
+
+export const getLikesCount = async (toUserId) => {
+  const user = await UserCollection.findById(toUserId).select('likesCount');
+  return user ? user.likesCount ?? 0 : 0;
+};
+
+export const isLikedBy = async (fromUserId, toUserId) => {
+  if (!fromUserId) return false;
+  const doc = await LikeCollection.findOne({ fromUserId, toUserId });
+  return !!doc;
+};
 
 export const likeUser = async (fromUserId, toUserId, io = null) => {
   if (!mongoose.Types.ObjectId.isValid(toUserId)) {
@@ -13,14 +24,20 @@ export const likeUser = async (fromUserId, toUserId, io = null) => {
   }
 
   try {
-    const likeDoc = await LikeCollection.create({ fromUserId, toUserId });
+    const exists = await LikeCollection.findOne({ fromUserId, toUserId });
+
+    if (exists) {
+      const likesCount = await getLikesCount(toUserId);
+      return { liked: true, likesCount };
+    }
+
+    await LikeCollection.create({ fromUserId, toUserId });
 
     await UserCollection.findByIdAndUpdate(toUserId, {
       $inc: { likesCount: 1 },
     });
 
-    // emit to sockets of target user (if io provided)
-    if (io && io.userSockets) {
+    if (io?.userSockets) {
       const set = io.userSockets.get(String(toUserId));
       if (set) {
         for (const s of set) {
@@ -29,12 +46,11 @@ export const likeUser = async (fromUserId, toUserId, io = null) => {
       }
     }
 
-    return likeDoc;
+    const likesCount = await getLikesCount(toUserId);
+    return { liked: true, likesCount };
   } catch (err) {
-    if (err.code === 11000) {
-      throw createHttpError(409, 'Уже лайкнуто');
-    }
     console.error('likeUser error', err);
+
     throw err;
   }
 };
@@ -44,17 +60,22 @@ export const unlikeUser = async (fromUserId, toUserId, io = null) => {
     throw createHttpError(400, 'Invalid target id');
   }
 
-  const deleted = await LikeCollection.findOneAndDelete({
-    fromUserId,
-    toUserId,
-  });
+  try {
+    const deleted = await LikeCollection.findOneAndDelete({
+      fromUserId,
+      toUserId,
+    });
 
-  if (deleted) {
+    if (!deleted) {
+      const likesCount = await getLikesCount(toUserId);
+      return { removed: false, liked: false, likesCount };
+    }
+
     await UserCollection.findByIdAndUpdate(toUserId, {
       $inc: { likesCount: -1 },
     });
 
-    if (io && io.userSockets) {
+    if (io?.userSockets) {
       const set = io.userSockets.get(String(toUserId));
       if (set) {
         for (const s of set) {
@@ -62,18 +83,11 @@ export const unlikeUser = async (fromUserId, toUserId, io = null) => {
         }
       }
     }
+
+    const likesCount = await getLikesCount(toUserId);
+    return { removed: true, liked: false, likesCount };
+  } catch (err) {
+    console.error('unlikeUser error', err);
+    throw err;
   }
-
-  return !!deleted;
-};
-
-export const isLikedBy = async (fromUserId, toUserId) => {
-  if (!fromUserId) return false;
-  const doc = await LikeCollection.findOne({ fromUserId, toUserId });
-  return !!doc;
-};
-
-export const getLikesCount = async (toUserId) => {
-  const user = await UserCollection.findById(toUserId).select('likesCount');
-  return user ? user.likesCount ?? 0 : 0;
 };
