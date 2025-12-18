@@ -1,7 +1,8 @@
+// contacts/likesController.js
+import createHttpError from 'http-errors';
 import * as likesService from './likes.js';
-import { initSocket } from '../socket/socket.js';
 
-export const likeUserController = async (req, res) => {
+export const likeUserController = async (req, res, next) => {
   const fromUserId = req.user._id;
   const toUserId = req.params.id;
   const io = req.app.get('io');
@@ -19,38 +20,28 @@ export const likeUserController = async (req, res) => {
     console.error('likeUserController error', err);
     if (err.status)
       return res.status(err.status).json({ message: err.message });
-    res.status(500).json({ message: 'Internal server error' });
+    return next(createHttpError(500, err.message || 'Internal server error'));
   }
 };
 
-export const unlikeUserController = async (req, res) => {
+export const unlikeUserController = async (req, res, next) => {
   const fromUserId = req.user._id;
   const toUserId = req.params.id;
+  const io = req.app.get('io');
 
-  const userSocket = initSocket(toUserId);
-  await likesService.unlikeUser(fromUserId, toUserId, userSocket);
+  try {
+    await likesService.unlikeUser(fromUserId, toUserId, io);
+    const likesCount = await likesService.getLikesCount(toUserId);
 
-  const likesCount = await likesService.getLikesCount(toUserId);
-  res.status(200).json({
-    status: 200,
-    message: 'Like removed',
-    data: { liked: false, likesCount },
-  });
-};
-
-export const getLikeStatusController = async (req, res) => {
-  const maybeUser = req.user;
-  const fromUserId = maybeUser ? maybeUser._id : null;
-  const toUserId = req.params.id;
-
-  const liked = fromUserId
-    ? await likesService.isLikedBy(fromUserId, toUserId)
-    : false;
-  const likesCount = await likesService.getLikesCount(toUserId);
-
-  res.json({
-    status: 200,
-    message: 'Like status fetched',
-    data: { liked, likesCount },
-  });
+    res.status(200).json({
+      status: 200,
+      message: 'Like removed',
+      data: { liked: false, likesCount },
+    });
+  } catch (err) {
+    console.error('unlikeUserController error', err);
+    if (err.status)
+      return res.status(err.status).json({ message: err.message });
+    return next(createHttpError(500, err.message || 'Internal server error'));
+  }
 };

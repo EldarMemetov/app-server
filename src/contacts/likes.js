@@ -1,35 +1,49 @@
+// contacts/likes.js
 import LikeCollection from '../db/models/like.js';
 import UserCollection from '../db/models/User.js';
 import createHttpError from 'http-errors';
+import mongoose from 'mongoose';
 
 export const likeUser = async (fromUserId, toUserId, io = null) => {
+  if (!mongoose.Types.ObjectId.isValid(toUserId)) {
+    throw createHttpError(400, 'Invalid target id');
+  }
   if (fromUserId.toString() === toUserId.toString()) {
     throw createHttpError(400, 'Нельзя лайкать себя');
   }
 
-  const exists = await LikeCollection.findOne({ fromUserId, toUserId });
-  if (exists) {
-    throw createHttpError(409, 'Уже лайкнуто');
-  }
-
   try {
     const likeDoc = await LikeCollection.create({ fromUserId, toUserId });
+
     await UserCollection.findByIdAndUpdate(toUserId, {
       $inc: { likesCount: 1 },
     });
 
-    if (io) {
-      io.to(toUserId.toString()).emit('likeUpdate', { toUserId, liked: true });
+    // emit to sockets of target user (if io provided)
+    if (io && io.userSockets) {
+      const set = io.userSockets.get(String(toUserId));
+      if (set) {
+        for (const s of set) {
+          s.emit('likeUpdate', { toUserId: String(toUserId), liked: true });
+        }
+      }
     }
 
     return likeDoc;
   } catch (err) {
+    if (err.code === 11000) {
+      throw createHttpError(409, 'Уже лайкнуто');
+    }
     console.error('likeUser error', err);
-    throw createHttpError(500, 'Не удалось поставить лайк');
+    throw err;
   }
 };
 
-export const unlikeUser = async (fromUserId, toUserId, socket = null) => {
+export const unlikeUser = async (fromUserId, toUserId, io = null) => {
+  if (!mongoose.Types.ObjectId.isValid(toUserId)) {
+    throw createHttpError(400, 'Invalid target id');
+  }
+
   const deleted = await LikeCollection.findOneAndDelete({
     fromUserId,
     toUserId,
@@ -40,8 +54,13 @@ export const unlikeUser = async (fromUserId, toUserId, socket = null) => {
       $inc: { likesCount: -1 },
     });
 
-    if (socket) {
-      socket.emit('likeUpdate', { toUserId, liked: false });
+    if (io && io.userSockets) {
+      const set = io.userSockets.get(String(toUserId));
+      if (set) {
+        for (const s of set) {
+          s.emit('likeUpdate', { toUserId: String(toUserId), liked: false });
+        }
+      }
     }
   }
 
