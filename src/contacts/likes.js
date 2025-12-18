@@ -1,5 +1,5 @@
 // contacts/likes.js
-import LikeCollection from '../db/models/Like.js';
+import LikeCollection from '../db/models/like.js';
 import UserCollection from '../db/models/User.js';
 import createHttpError from 'http-errors';
 import mongoose from 'mongoose';
