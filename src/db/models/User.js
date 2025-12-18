@@ -46,7 +46,7 @@ const userSchema = new Schema(
     aboutMe: { type: String, default: '' },
 
     isBlocked: { type: Boolean, default: false },
-
+    likesCount: { type: Number, default: 0 },
     portfolio: [
       {
         type: { type: String, enum: ['photo', 'video'], required: true },
