@@ -1,14 +1,13 @@
-// contacts/likesController.js
 import createHttpError from 'http-errors';
 import * as likesService from './likes.js';
-import { getSocketForUser } from '../socket/socketUtils.js';
+import { initSocket } from '../socket/socket.js';
 
 export const likeUserController = async (req, res) => {
   const fromUserId = req.user._id;
   const toUserId = req.params.id;
 
   try {
-    const userSocket = getSocketForUser(toUserId);
+    const userSocket = initSocket(toUserId);
     await likesService.likeUser(fromUserId, toUserId, userSocket);
     const likesCount = await likesService.getLikesCount(toUserId);
 
@@ -27,7 +26,7 @@ export const unlikeUserController = async (req, res) => {
   const fromUserId = req.user._id;
   const toUserId = req.params.id;
 
-  const userSocket = getSocketForUser(toUserId);
+  const userSocket = initSocket(toUserId);
   await likesService.unlikeUser(fromUserId, toUserId, userSocket);
 
   const likesCount = await likesService.getLikesCount(toUserId);
