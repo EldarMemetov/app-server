@@ -1,14 +1,13 @@
-import createHttpError from 'http-errors';
 import * as likesService from './likes.js';
 import { initSocket } from '../socket/socket.js';
 
 export const likeUserController = async (req, res) => {
   const fromUserId = req.user._id;
   const toUserId = req.params.id;
+  const io = req.app.get('io');
 
   try {
-    const userSocket = initSocket(toUserId);
-    await likesService.likeUser(fromUserId, toUserId, userSocket);
+    await likesService.likeUser(fromUserId, toUserId, io);
     const likesCount = await likesService.getLikesCount(toUserId);
 
     res.status(200).json({
@@ -17,8 +16,10 @@ export const likeUserController = async (req, res) => {
       data: { liked: true, likesCount },
     });
   } catch (err) {
-    if (err.status) throw err;
-    throw createHttpError(500, err.message);
+    console.error('likeUserController error', err);
+    if (err.status)
+      return res.status(err.status).json({ message: err.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
