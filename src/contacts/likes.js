@@ -40,31 +40,32 @@ export const likeUser = async (fromUserId, toUserId, io = null) => {
 };
 
 export const unlikeUser = async (fromUserId, toUserId, io = null) => {
-  if (!mongoose.Types.ObjectId.isValid(toUserId)) {
-    throw createHttpError(400, 'Invalid target id');
-  }
-
   const deleted = await LikeCollection.findOneAndDelete({
     fromUserId,
     toUserId,
   });
 
-  if (deleted) {
-    await UserCollection.findByIdAndUpdate(toUserId, {
-      $inc: { likesCount: -1 },
-    });
+  if (!deleted) {
+    return false;
+  }
 
-    if (io && io.userSockets) {
-      const set = io.userSockets.get(String(toUserId));
-      if (set) {
-        for (const s of set) {
-          s.emit('likeUpdate', { toUserId: String(toUserId), liked: false });
-        }
+  await UserCollection.findByIdAndUpdate(toUserId, {
+    $inc: { likesCount: -1 },
+  });
+
+  if (io?.userSockets) {
+    const sockets = io.userSockets.get(String(toUserId));
+    if (sockets) {
+      for (const s of sockets) {
+        s.emit('likeUpdate', {
+          toUserId: String(toUserId),
+          liked: false,
+        });
       }
     }
   }
 
-  return !!deleted;
+  return true;
 };
 
 export const isLikedBy = async (fromUserId, toUserId) => {

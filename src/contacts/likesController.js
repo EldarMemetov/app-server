@@ -25,23 +25,22 @@ export const likeUserController = async (req, res, next) => {
 };
 
 export const unlikeUserController = async (req, res, next) => {
-  const fromUserId = req.user._id;
-  const toUserId = req.params.id;
-  const io = req.app.get('io');
-
   try {
-    await likesService.unlikeUser(fromUserId, toUserId, io);
+    const fromUserId = req.user._id;
+    const toUserId = req.params.id;
+    const io = req.app.get('io');
+
+    const removed = await likesService.unlikeUser(fromUserId, toUserId, io);
+
     const likesCount = await likesService.getLikesCount(toUserId);
 
-    res.status(200).json({
+    return res.status(200).json({
       status: 200,
-      message: 'Like removed',
+      message: removed ? 'Like removed' : 'Like already removed',
       data: { liked: false, likesCount },
     });
   } catch (err) {
-    console.error('unlikeUserController error', err);
-    if (err.status)
-      return res.status(err.status).json({ message: err.message });
-    return next(createHttpError(500, err.message || 'Internal server error'));
+    console.error('unlikeUserController error:', err);
+    return next(createHttpError(500, 'Internal server error'));
   }
 };
