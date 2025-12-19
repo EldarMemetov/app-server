@@ -1,7 +1,7 @@
 // contacts/likesController.js
 import createHttpError from 'http-errors';
 import * as likesService from './likes.js';
-
+import mongoose from 'mongoose';
 export const likeUserController = async (req, res, next) => {
   const fromUserId = req.user && req.user._id;
   const toUserId = req.params.id;
@@ -48,15 +48,48 @@ export const unlikeUserController = async (req, res, next) => {
   }
 };
 
+// export const getLikeStatusController = async (req, res, next) => {
+//   const maybeUser = req.user;
+//   const fromUserId = maybeUser ? maybeUser._id : null;
+//   const toUserId = req.params.id;
+
+//   try {
+//     const liked = fromUserId
+//       ? await likesService.isLikedBy(fromUserId, toUserId)
+//       : false;
+//     const likesCount = await likesService.getLikesCount(toUserId);
+
+//     res.json({
+//       status: 200,
+//       message: 'Like status fetched',
+//       data: { liked, likesCount },
+//     });
+//   } catch (err) {
+//     console.error('getLikeStatusController error', err);
+
+//     if (
+//       err.name === 'CastError' ||
+//       err.message?.includes('Invalid target id')
+//     ) {
+//       return next(createHttpError(400, 'Invalid user id'));
+//     }
+//     return next(createHttpError(500, err.message || 'Internal server error'));
+//   }
+// };
 export const getLikeStatusController = async (req, res, next) => {
   const maybeUser = req.user;
   const fromUserId = maybeUser ? maybeUser._id : null;
   const toUserId = req.params.id;
 
+  if (!mongoose.Types.ObjectId.isValid(toUserId)) {
+    return next(createHttpError(400, 'Invalid user id'));
+  }
+
   try {
     const liked = fromUserId
       ? await likesService.isLikedBy(fromUserId, toUserId)
       : false;
+
     const likesCount = await likesService.getLikesCount(toUserId);
 
     res.json({
@@ -66,13 +99,6 @@ export const getLikeStatusController = async (req, res, next) => {
     });
   } catch (err) {
     console.error('getLikeStatusController error', err);
-
-    if (
-      err.name === 'CastError' ||
-      err.message?.includes('Invalid target id')
-    ) {
-      return next(createHttpError(400, 'Invalid user id'));
-    }
     return next(createHttpError(500, err.message || 'Internal server error'));
   }
 };

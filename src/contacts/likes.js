@@ -97,6 +97,7 @@ import createHttpError from 'http-errors';
 import mongoose from 'mongoose';
 
 export const getLikesCount = async (toUserId) => {
+  if (!mongoose.Types.ObjectId.isValid(toUserId)) return 0;
   const user = await UserCollection.findById(toUserId).select('likesCount');
   return user ? user.likesCount ?? 0 : 0;
 };
@@ -110,33 +111,40 @@ export const likeUser = async (fromUserId, toUserId, io = null) => {
   }
 
   try {
+    // если уже есть — вернем текущее значение
     const exists = await LikeCollection.findOne({ fromUserId, toUserId });
-
     if (exists) {
       const likesCount = await getLikesCount(toUserId);
-
-      if (io?.userSockets) {
-        const set = io.userSockets.get(String(toUserId));
-        if (set) {
-          for (const s of set) {
-            s.emit('likeUpdate', {
-              toUserId: String(toUserId),
-              liked: true,
-              likesCount,
-            });
-          }
-        }
-
-        io.emit('likeUpdate', {
-          toUserId: String(toUserId),
-          liked: true,
-          likesCount,
-        });
+      // broadcast
+      if (io) {
+        const payload = { toUserId: String(toUserId), liked: true, likesCount };
+        const set = io.userSockets?.get(String(toUserId));
+        if (set) for (const s of set) s.emit('likeUpdate', payload);
+        io.emit('likeUpdate', payload);
       }
       return { liked: true, likesCount };
     }
 
-    await LikeCollection.create({ fromUserId, toUserId });
+    // пробуем создать; если duplicate -> считаем как already liked
+    try {
+      await LikeCollection.create({ fromUserId, toUserId });
+    } catch (err) {
+      if (err?.code === 11000) {
+        const likesCount = await getLikesCount(toUserId);
+        if (io) {
+          const payload = {
+            toUserId: String(toUserId),
+            liked: true,
+            likesCount,
+          };
+          const set = io.userSockets?.get(String(toUserId));
+          if (set) for (const s of set) s.emit('likeUpdate', payload);
+          io.emit('likeUpdate', payload);
+        }
+        return { liked: true, likesCount };
+      }
+      throw err;
+    }
 
     const updatedUser = await UserCollection.findByIdAndUpdate(
       toUserId,
@@ -147,23 +155,11 @@ export const likeUser = async (fromUserId, toUserId, io = null) => {
     const likesCount =
       updatedUser?.likesCount ?? (await getLikesCount(toUserId));
 
-    if (io?.userSockets) {
-      const set = io.userSockets.get(String(toUserId));
-      if (set) {
-        for (const s of set) {
-          s.emit('likeUpdate', {
-            toUserId: String(toUserId),
-            liked: true,
-            likesCount,
-          });
-        }
-      }
-
-      io.emit('likeUpdate', {
-        toUserId: String(toUserId),
-        liked: true,
-        likesCount,
-      });
+    if (io) {
+      const payload = { toUserId: String(toUserId), liked: true, likesCount };
+      const set = io.userSockets?.get(String(toUserId));
+      if (set) for (const s of set) s.emit('likeUpdate', payload);
+      io.emit('likeUpdate', payload);
     }
 
     return { liked: true, likesCount };
