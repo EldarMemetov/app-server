@@ -225,3 +225,13 @@ export const unlikeUser = async (fromUserId, toUserId, io = null) => {
     throw err;
   }
 };
+export const isLikedBy = async (fromUserId, toUserId) => {
+  if (!fromUserId) return false;
+
+  const doc = await LikeCollection.findOne({
+    fromUserId,
+    toUserId,
+  });
+
+  return Boolean(doc);
+};
