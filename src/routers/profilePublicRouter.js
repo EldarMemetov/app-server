@@ -31,6 +31,10 @@ router.delete(
   ctrlWrapper(likesController.unlikeUserController),
 );
 
-router.get('/:id', ctrlWrapper(profileController.getProfileByIdController));
+router.get(
+  '/:id',
+  optionalAuthenticate,
+  ctrlWrapper(profileController.getProfileByIdController),
+);
 
 export default router;
