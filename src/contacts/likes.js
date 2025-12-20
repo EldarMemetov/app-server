@@ -9,109 +9,108 @@ export const getLikesCount = async (toUserId) => {
   return user ? user.likesCount ?? 0 : 0;
 };
 
-// export const likeUser = async (fromUserId, toUserId, io = null) => {
-//   if (!mongoose.Types.ObjectId.isValid(toUserId)) {
-//     throw createHttpError(400, 'Invalid target id');
-//   }
-//   if (fromUserId.toString() === toUserId.toString()) {
-//     throw createHttpError(400, 'Нельзя лайкать себя');
-//   }
-
-//   try {
-
-//     const exists = await LikeCollection.findOne({ fromUserId, toUserId });
-//     if (exists) {
-//       const likesCount = await getLikesCount(toUserId);
-
-//       if (io) {
-//         const payload = { toUserId: String(toUserId), liked: true, likesCount };
-//         const set = io.userSockets?.get(String(toUserId));
-//         if (set) for (const s of set) s.emit('likeUpdate', payload);
-//         io.emit('likeUpdate', payload);
-//       }
-//       return { liked: true, likesCount };
-//     }
-
-//     try {
-//       await LikeCollection.create({ fromUserId, toUserId });
-//     } catch (err) {
-//       if (err?.code === 11000) {
-//         const likesCount = await getLikesCount(toUserId);
-//         if (io) {
-//           const payload = {
-//             toUserId: String(toUserId),
-//             liked: true,
-//             likesCount,
-//           };
-//           const set = io.userSockets?.get(String(toUserId));
-//           if (set) for (const s of set) s.emit('likeUpdate', payload);
-//           io.emit('likeUpdate', payload);
-//         }
-//         return { liked: true, likesCount };
-//       }
-//       throw err;
-//     }
-
-//     const updatedUser = await UserCollection.findByIdAndUpdate(
-//       toUserId,
-//       { $inc: { likesCount: 1 } },
-//       { new: true },
-//     );
-
-//     const likesCount =
-//       updatedUser?.likesCount ?? (await getLikesCount(toUserId));
-
-//     if (io) {
-//       const payload = { toUserId: String(toUserId), liked: true, likesCount };
-//       const set = io.userSockets?.get(String(toUserId));
-//       if (set) for (const s of set) s.emit('likeUpdate', payload);
-//       io.emit('likeUpdate', payload);
-//     }
-
-//     return { liked: true, likesCount };
-//   } catch (err) {
-//     console.error('likeUser error', err);
-//     throw err;
-//   }
-// };
 export const likeUser = async (fromUserId, toUserId, io = null) => {
-  const session = await mongoose.startSession();
-  try {
-    session.startTransaction();
+  if (!mongoose.Types.ObjectId.isValid(toUserId)) {
+    throw createHttpError(400, 'Invalid target id');
+  }
+  if (fromUserId.toString() === toUserId.toString()) {
+    throw createHttpError(400, 'Нельзя лайкать себя');
+  }
 
-    const exists = await LikeCollection.findOne({
-      fromUserId,
-      toUserId,
-    }).session(session);
+  try {
+    const exists = await LikeCollection.findOne({ fromUserId, toUserId });
     if (exists) {
       const likesCount = await getLikesCount(toUserId);
 
-      await session.commitTransaction();
+      if (io) {
+        const payload = { toUserId: String(toUserId), liked: true, likesCount };
+        const set = io.userSockets?.get(String(toUserId));
+        if (set) for (const s of set) s.emit('likeUpdate', payload);
+        io.emit('likeUpdate', payload);
+      }
       return { liked: true, likesCount };
     }
 
-    await LikeCollection.create([{ fromUserId, toUserId }], { session });
+    try {
+      await LikeCollection.create({ fromUserId, toUserId });
+    } catch (err) {
+      if (err?.code === 11000) {
+        const likesCount = await getLikesCount(toUserId);
+        if (io) {
+          const payload = {
+            toUserId: String(toUserId),
+            liked: true,
+            likesCount,
+          };
+          const set = io.userSockets?.get(String(toUserId));
+          if (set) for (const s of set) s.emit('likeUpdate', payload);
+          io.emit('likeUpdate', payload);
+        }
+        return { liked: true, likesCount };
+      }
+      throw err;
+    }
 
     const updatedUser = await UserCollection.findByIdAndUpdate(
       toUserId,
       { $inc: { likesCount: 1 } },
-      { new: true, session },
+      { new: true },
     );
 
     const likesCount =
       updatedUser?.likesCount ?? (await getLikesCount(toUserId));
 
-    await session.commitTransaction();
+    if (io) {
+      const payload = { toUserId: String(toUserId), liked: true, likesCount };
+      const set = io.userSockets?.get(String(toUserId));
+      if (set) for (const s of set) s.emit('likeUpdate', payload);
+      io.emit('likeUpdate', payload);
+    }
 
     return { liked: true, likesCount };
   } catch (err) {
-    await session.abortTransaction();
-
+    console.error('likeUser error', err);
     throw err;
-  } finally {
-    session.endSession();
   }
 };
+// export const likeUser = async (fromUserId, toUserId, io = null) => {
+//   const session = await mongoose.startSession();
+//   try {
+//     session.startTransaction();
+
+//     const exists = await LikeCollection.findOne({
+//       fromUserId,
+//       toUserId,
+//     }).session(session);
+//     if (exists) {
+//       const likesCount = await getLikesCount(toUserId);
+
+//       await session.commitTransaction();
+//       return { liked: true, likesCount };
+//     }
+
+//     await LikeCollection.create([{ fromUserId, toUserId }], { session });
+
+//     const updatedUser = await UserCollection.findByIdAndUpdate(
+//       toUserId,
+//       { $inc: { likesCount: 1 } },
+//       { new: true, session },
+//     );
+
+//     const likesCount =
+//       updatedUser?.likesCount ?? (await getLikesCount(toUserId));
+
+//     await session.commitTransaction();
+
+//     return { liked: true, likesCount };
+//   } catch (err) {
+//     await session.abortTransaction();
+
+//     throw err;
+//   } finally {
+//     session.endSession();
+//   }
+// };
 
 export const unlikeUser = async (fromUserId, toUserId, io = null) => {
   if (!mongoose.Types.ObjectId.isValid(toUserId)) {
