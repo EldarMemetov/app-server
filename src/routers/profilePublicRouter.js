@@ -13,6 +13,8 @@ const router = Router();
 router.get('/filter', ctrlWrapper(filterUsersController));
 router.get('/all', ctrlWrapper(profileController.getAllProfilesController));
 
+router.get('/:id', ctrlWrapper(profileController.getProfileByIdController));
+
 router.get(
   '/:id/like',
   optionalAuthenticate,
@@ -30,7 +32,5 @@ router.delete(
   authenticate,
   ctrlWrapper(likesController.unlikeUserController),
 );
-
-router.get('/:id', ctrlWrapper(profileController.getProfileByIdController));
 
 export default router;
