@@ -2,6 +2,7 @@ import Notification from '../db/models/Notification.js';
 
 export const createNotification = async ({
   user,
+  fromUser = null,
   type = 'info',
   key,
   title,
@@ -33,8 +34,9 @@ export const createNotification = async ({
     if (exists) return exists;
   }
 
-  return await Notification.create({
+  const doc = await Notification.create({
     user,
+    fromUser,
     type,
     key,
     title,
@@ -44,4 +46,6 @@ export const createNotification = async ({
     meta,
     scheduledAt,
   });
+
+  return doc;
 };
