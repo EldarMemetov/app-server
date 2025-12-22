@@ -239,3 +239,25 @@ export const resetPassword = async (payload) => {
     { password: encryptedPassword },
   );
 };
+export const changePassword = async (userId, currentPassword, newPassword) => {
+  if (!userId) throw createHttpError(401, 'Not authenticated');
+  if (!currentPassword || !newPassword)
+    throw createHttpError(400, 'currentPassword and newPassword are required');
+
+  const user = await UserCollection.findById(userId).select('+password');
+  if (!user) throw createHttpError(404, 'User not found');
+
+  const ok = await bcrypt.compare(currentPassword, user.password);
+  if (!ok) throw createHttpError(401, 'Current password is incorrect');
+
+  const hashed = await bcrypt.hash(newPassword, 10);
+  await UserCollection.updateOne({ _id: userId }, { password: hashed });
+
+  try {
+    await SessionCollection.deleteMany({ userId });
+  } catch (e) {
+    console.warn('Failed to delete sessions after password change', e);
+  }
+
+  return true;
+};

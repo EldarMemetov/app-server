@@ -157,3 +157,18 @@ export const userLoginWithGoogleOAuthControllers = async (req, res) => {
     },
   });
 };
+export const changePasswordController = async (req, res) => {
+  const userId = req.user && req.user._id;
+  const { currentPassword, newPassword } = req.body;
+
+  try {
+    await authServices.changePassword(userId, currentPassword, newPassword);
+    res.json({ status: 200, message: 'Password changed successfully' });
+  } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    console.error('changePasswordController error', err);
+    return res.status(500).json({ message: 'Internal Server Error' });
+  }
+};

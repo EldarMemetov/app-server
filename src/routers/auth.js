@@ -7,7 +7,10 @@ import {
   userSigninSchema,
 } from '../validation/users.js';
 import { requestResetEmailSchema } from '../validation/mail.js';
+import authenticate from '../middlewares/authenticate.js';
 
+import { changePasswordSchema } from '../validation/auth.js';
+import { changePasswordController } from '../controllers/auth.js';
 import { resetPasswordSchema } from '../validation/auth.js';
 
 const authRouter = Router();
@@ -46,5 +49,10 @@ authRouter.post(
   validateBody(userLoginWithGoogleOAuthSchema),
   ctrlWrapper(authControllers.userLoginWithGoogleOAuthControllers),
 );
-
+authRouter.post(
+  '/change-password',
+  authenticate,
+  validateBody(changePasswordSchema),
+  ctrlWrapper(changePasswordController),
+);
 export default authRouter;
