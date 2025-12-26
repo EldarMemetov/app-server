@@ -2,6 +2,9 @@
 import createHttpError from 'http-errors';
 import * as likesService from './likes.js';
 import mongoose from 'mongoose';
+import { toggleLike } from './likesGeneric.js';
+import LikeCollection from '../db/models/like.js';
+import PostCollection from '../db/models/Post.js';
 export const likeUserController = async (req, res, next) => {
   const fromUserId = req.user && req.user._id;
   const toUserId = req.params.id;
@@ -72,5 +75,74 @@ export const getLikeStatusController = async (req, res, next) => {
   } catch (err) {
     console.error('getLikeStatusController error', err);
     return next(createHttpError(500, err.message || 'Internal server error'));
+  }
+};
+
+export const getPostLikeStatusController = async (req, res, next) => {
+  const maybeUser = req.user;
+  const fromUserId = maybeUser ? maybeUser._id : null;
+  const postId = req.params.id;
+
+  if (!mongoose.Types.ObjectId.isValid(postId)) {
+    return next(createHttpError(400, 'Invalid post id'));
+  }
+
+  const post = await PostCollection.findById(postId)
+    .select('likesCount')
+    .lean();
+  if (!post) return next(createHttpError(404, 'Post not found'));
+
+  try {
+    const liked = fromUserId
+      ? Boolean(
+          await LikeCollection.findOne({
+            fromUserId,
+            targetType: 'post',
+            targetId: postId,
+          }),
+        )
+      : false;
+
+    const likesCount =
+      typeof post.likesCount === 'number'
+        ? post.likesCount
+        : await LikeCollection.countDocuments({
+            targetType: 'post',
+            targetId: postId,
+          });
+
+    res.json({
+      status: 200,
+      message: 'Post like status fetched',
+      data: { liked, likesCount },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+export const toggleLikeController = async (req, res, next) => {
+  const { id } = req.params;
+  const fromUserId =
+    req.user && req.user._1d ? req.user._1d : req.user && req.user._id;
+  const io = req.app.get('io');
+
+  if (!fromUserId) return next(createHttpError(401, 'User not authenticated'));
+
+  try {
+    const result = await toggleLike({
+      fromUserId,
+      targetType: 'post',
+      targetId: id,
+      io,
+    });
+
+    res.json({
+      status: 200,
+      message: result.liked ? 'Post liked' : 'Like removed',
+      data: { liked: result.liked, likesCount: result.likesCount ?? 0 },
+    });
+  } catch (err) {
+    return next(err);
   }
 };

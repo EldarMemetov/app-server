@@ -2,7 +2,7 @@ import PostCollection from '../db/models/Post.js';
 
 import createHttpError from 'http-errors';
 import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
-
+import { toggleLike } from './likesGeneric.js';
 export const createPostWithMediaController = async (req, res) => {
   const { _id: userId } = req.user;
   if (!userId) throw createHttpError(401, 'Unauthorized');
@@ -128,29 +128,54 @@ export const deletePostController = async (req, res) => {
   });
 };
 
-// ❤️ Лайк / убрать лайк
-export const toggleLikeController = async (req, res) => {
+// // ❤️ Лайк / убрать лайк
+// export const toggleLikeController = async (req, res) => {
+//   const { id } = req.params;
+//   const userId = req.user._id;
+
+//   const post = await PostCollection.findById(id);
+//   if (!post) throw createHttpError(404, 'Post not found');
+
+//   const isLiked = post.likes.includes(userId);
+
+//   if (isLiked) {
+//     post.likes.pull(userId);
+//   } else {
+//     post.likes.push(userId);
+//   }
+
+//   await post.save();
+
+//   res.json({
+//     status: 200,
+//     message: isLiked ? 'Like removed' : 'Post liked',
+//     likesCount: post.likes.length,
+//   });
+// };
+
+export const toggleLikeController = async (req, res, next) => {
   const { id } = req.params;
-  const userId = req.user._id;
+  const fromUserId = req.user && req.user._id;
+  const io = req.app.get('io');
 
-  const post = await PostCollection.findById(id);
-  if (!post) throw createHttpError(404, 'Post not found');
+  if (!fromUserId) return next(createHttpError(401, 'User not authenticated'));
 
-  const isLiked = post.likes.includes(userId);
+  try {
+    const result = await toggleLike({
+      fromUserId,
+      targetType: 'post',
+      targetId: id,
+      io,
+    });
 
-  if (isLiked) {
-    post.likes.pull(userId);
-  } else {
-    post.likes.push(userId);
+    res.json({
+      status: 200,
+      message: result.liked ? 'Post liked' : 'Like removed',
+      data: { liked: result.liked, likesCount: result.likesCount ?? 0 },
+    });
+  } catch (err) {
+    return next(err);
   }
-
-  await post.save();
-
-  res.json({
-    status: 200,
-    message: isLiked ? 'Like removed' : 'Post liked',
-    likesCount: post.likes.length,
-  });
 };
 
 // ⭐ Добавить / удалить из избранного
