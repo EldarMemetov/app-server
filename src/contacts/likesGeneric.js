@@ -29,12 +29,10 @@ export const toggleLike = async ({
 
   const map = TARGET_MAP[targetType];
 
-  const session = await mongoose.startSession();
-  session.startTransaction();
   try {
     let targetDoc = null;
     if (map) {
-      targetDoc = await map.model.findById(targetId).session(session);
+      targetDoc = await map.model.findById(targetId).lean();
       if (!targetDoc) throw createHttpError(404, `${targetType} not found`);
     }
 
@@ -42,29 +40,42 @@ export const toggleLike = async ({
       fromUserId,
       targetType,
       targetId,
-    }).session(session);
+    });
 
-    let liked;
+    let liked = false;
+
     if (existing) {
-      await LikeCollection.deleteOne({ _id: existing._id }).session(session);
-      if (map && typeof targetDoc.likesCount !== 'undefined') {
-        await map.model.findByIdAndUpdate(
-          targetId,
-          { $inc: { likesCount: -1 } },
-          { new: true, session },
-        );
+      await LikeCollection.deleteOne({ _id: existing._id });
+
+      if (map) {
+        await map.model
+          .findByIdAndUpdate(
+            targetId,
+            { $inc: { likesCount: -1 } },
+            { new: true },
+          )
+          .catch(() => {});
       }
       liked = false;
     } else {
-      const like = new LikeCollection({ fromUserId, targetType, targetId });
-      await like.save({ session });
+      try {
+        await LikeCollection.create({ fromUserId, targetType, targetId });
+      } catch (err) {
+        if (err?.code === 11000) {
+          liked = true;
+        } else {
+          throw err;
+        }
+      }
 
-      if (map && typeof targetDoc.likesCount !== 'undefined') {
-        await map.model.findByIdAndUpdate(
-          targetId,
-          { $inc: { likesCount: 1 } },
-          { new: true, session },
-        );
+      if (!liked && map) {
+        await map.model
+          .findByIdAndUpdate(
+            targetId,
+            { $inc: { likesCount: 1 } },
+            { new: true },
+          )
+          .catch(() => {});
       }
       liked = true;
     }
@@ -74,24 +85,21 @@ export const toggleLike = async ({
       const refreshed = await map.model
         .findById(targetId)
         .select('likesCount')
-        .session(session);
+        .lean();
       if (typeof refreshed?.likesCount === 'number') {
         likesCount = refreshed.likesCount;
       } else {
         likesCount = await LikeCollection.countDocuments({
           targetType,
           targetId,
-        }).session(session);
+        });
       }
     } else {
       likesCount = await LikeCollection.countDocuments({
         targetType,
         targetId,
-      }).session(session);
+      });
     }
-
-    await session.commitTransaction();
-    session.endSession();
 
     try {
       const ownerId = map ? map.getOwnerId(targetDoc) : null;
@@ -101,7 +109,6 @@ export const toggleLike = async ({
         liked,
         likesCount,
         fromUserId: String(fromUserId),
-
         toUserId: targetType === 'user' ? String(targetId) : undefined,
       };
 
@@ -109,12 +116,12 @@ export const toggleLike = async ({
         const set = io.userSockets.get(String(ownerId));
         if (set) for (const s of set) s.emit('likeUpdate', payload);
       }
-      if (io) io.emit('likeUpdate', payload);
+      if (io && typeof io.emit === 'function') io.emit('likeUpdate', payload);
 
       if (ownerId && String(ownerId) !== String(fromUserId)) {
-        const fromUser = await UserCollection.findById(fromUserId).select(
-          'name surname photo',
-        );
+        const fromUser = await UserCollection.findById(fromUserId)
+          .select('name surname photo')
+          .lean();
         let title = '',
           message = '',
           meta = {};
@@ -133,7 +140,6 @@ export const toggleLike = async ({
             fromUserId: String(fromUserId),
           };
         }
-
         try {
           await createNotification({
             user: ownerId,
@@ -157,8 +163,7 @@ export const toggleLike = async ({
 
     return { liked, likesCount };
   } catch (err) {
-    await session.abortTransaction();
-    session.endSession();
+    console.error('toggleLike error:', err);
     throw err;
   }
 };
