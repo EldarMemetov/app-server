@@ -123,8 +123,8 @@ export const getPostLikeStatusController = async (req, res, next) => {
 
 export const toggleLikeController = async (req, res, next) => {
   const { id } = req.params;
-  const fromUserId =
-    req.user && req.user._1d ? req.user._1d : req.user && req.user._id;
+  const fromUserId = req.user && req.user._id;
+
   const io = req.app.get('io');
 
   if (!fromUserId) return next(createHttpError(401, 'User not authenticated'));

@@ -11,16 +11,19 @@ import upload from '../middlewares/uploadMiddleware.js';
 import { filterPostsController } from '../contacts/filterController.js';
 import * as postNotifications from '../contacts/postNotifications.js';
 import optionalAuthenticate from '../middlewares/optionalAuthenticate.js';
+import * as likesController from '../contacts/likesController.js';
 const postsRouter = Router();
 
 postsRouter.get('/filter', ctrlWrapper(filterPostsController));
 postsRouter.get('/', ctrlWrapper(postsController.getAllPostsController));
 postsRouter.get('/:id', ctrlWrapper(postsController.getPostByIdController));
+
 postsRouter.get(
   '/:id/like',
   optionalAuthenticate,
-  ctrlWrapper(postsController.getPostLikeStatusController),
+  ctrlWrapper(likesController.getPostLikeStatusController),
 );
+
 postsRouter.post(
   '/add',
   authenticate,
@@ -50,12 +53,12 @@ postsRouter.delete(
   ctrlWrapper(postsController.deletePostController),
 );
 
-// postsRouter.patch(
-//   '/:id/like',
-//   authenticate,
-//   checkBlocked,
-//   ctrlWrapper(postsController.toggleLikeController),
-// );
+postsRouter.patch(
+  '/:id/like',
+  authenticate,
+  checkBlocked,
+  ctrlWrapper(postsController.toggleLikeController),
+);
 postsRouter.patch(
   '/:id/favorite',
   authenticate,
