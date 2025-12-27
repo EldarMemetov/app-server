@@ -128,31 +128,6 @@ export const deletePostController = async (req, res) => {
   });
 };
 
-// // ❤️ Лайк / убрать лайк
-// export const toggleLikeController = async (req, res) => {
-//   const { id } = req.params;
-//   const userId = req.user._id;
-
-//   const post = await PostCollection.findById(id);
-//   if (!post) throw createHttpError(404, 'Post not found');
-
-//   const isLiked = post.likes.includes(userId);
-
-//   if (isLiked) {
-//     post.likes.pull(userId);
-//   } else {
-//     post.likes.push(userId);
-//   }
-
-//   await post.save();
-
-//   res.json({
-//     status: 200,
-//     message: isLiked ? 'Like removed' : 'Post liked',
-//     likesCount: post.likes.length,
-//   });
-// };
-
 export const toggleLikeController = async (req, res, next) => {
   const { id } = req.params;
   const fromUserId = req.user && req.user._id;
@@ -220,7 +195,7 @@ export const addCommentController = async (req, res) => {
     status: 201,
     message: 'Comment added successfully',
     commentsCount: post.comments.length,
-    data: post.comments[post.comments.length - 1], // возвращаем сам комментарий
+    data: post.comments[post.comments.length - 1],
   });
 };
 
