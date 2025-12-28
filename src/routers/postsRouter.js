@@ -15,8 +15,16 @@ import * as likesController from '../contacts/likesController.js';
 const postsRouter = Router();
 
 postsRouter.get('/filter', ctrlWrapper(filterPostsController));
-postsRouter.get('/', ctrlWrapper(postsController.getAllPostsController));
-postsRouter.get('/:id', ctrlWrapper(postsController.getPostByIdController));
+postsRouter.get(
+  '/',
+  optionalAuthenticate,
+  ctrlWrapper(postsController.getAllPostsController),
+);
+postsRouter.get(
+  '/:id',
+  optionalAuthenticate,
+  ctrlWrapper(postsController.getPostByIdController),
+);
 
 postsRouter.get(
   '/:id/like',
@@ -59,12 +67,12 @@ postsRouter.patch(
   checkBlocked,
   ctrlWrapper(postsController.toggleLikeController),
 );
-postsRouter.patch(
-  '/:id/favorite',
-  authenticate,
-  checkBlocked,
-  ctrlWrapper(postsController.toggleFavoriteController),
-);
+// postsRouter.patch(
+//   '/:id/favorite',
+//   authenticate,
+//   checkBlocked,
+//   ctrlWrapper(postsController.toggleFavoriteController),
+// );
 postsRouter.post(
   '/:id/comment',
   authenticate,

@@ -23,30 +23,24 @@ export const toggleFavorite = async ({ userId, targetType, targetId }) => {
   }
 
   const TargetModel = TARGET_MAP[targetType];
-
   const targetExists = await TargetModel.exists({ _id: targetId });
-  if (!targetExists) {
-    throw createHttpError(404, `${targetType} not found`);
-  }
+  if (!targetExists) throw createHttpError(404, `${targetType} not found`);
 
-  const existing = await Favorite.findOne({
+  const removed = await Favorite.findOneAndDelete({
     userId,
     targetType,
     targetId,
   });
 
-  if (existing) {
-    await Favorite.deleteOne({ _id: existing._id });
-    return { favorited: false };
+  if (removed) return { favorited: false };
+
+  try {
+    await Favorite.create({ userId, targetType, targetId });
+    return { favorited: true };
+  } catch (err) {
+    if (err.code === 11000) return { favorited: true };
+    throw err;
   }
-
-  await Favorite.create({
-    userId,
-    targetType,
-    targetId,
-  });
-
-  return { favorited: true };
 };
 
 export const getMyFavoritesController = async (req, res, next) => {
