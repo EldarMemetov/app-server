@@ -1,8 +1,10 @@
 import PostCollection from '../db/models/Post.js';
-
+import Favorite from '../db/models/Favorite.js';
 import createHttpError from 'http-errors';
 import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
 import { toggleLike } from './likesGeneric.js';
+import { toggleFavorite as toggleFavoriteService } from './favorites.js';
+
 export const createPostWithMediaController = async (req, res) => {
   const { _id: userId } = req.user;
   if (!userId) throw createHttpError(401, 'Unauthorized');
@@ -43,46 +45,118 @@ export const createPostController = async (req, res) => {
   });
 };
 
-export const getAllPostsController = async (req, res) => {
-  const { roleNeeded, city, type } = req.query;
+// export const getAllPostsController = async (req, res) => {
+//   const { roleNeeded, city, type } = req.query;
 
-  const filter = {};
-  if (roleNeeded) filter.roleNeeded = { $in: roleNeeded.split(',') };
-  if (city) filter.city = city;
-  if (type) filter.type = type;
+//   const filter = {};
+//   if (roleNeeded) filter.roleNeeded = { $in: roleNeeded.split(',') };
+//   if (city) filter.city = city;
+//   if (type) filter.type = type;
 
-  const posts = await PostCollection.find(filter)
-    .populate('author', 'name surname city role photo')
-    .sort({ createdAt: -1 });
+//   const posts = await PostCollection.find(filter)
+//     .populate('author', 'name surname city role photo')
+//     .sort({ createdAt: -1 });
 
-  if (!posts || posts.length === 0) {
-    throw createHttpError(404, 'No posts found');
+//   if (!posts || posts.length === 0) {
+//     throw createHttpError(404, 'No posts found');
+//   }
+
+//   res.json({
+//     status: 200,
+//     message: 'Posts fetched successfully',
+//     data: posts,
+//   });
+// };
+
+export const getAllPostsController = async (req, res, next) => {
+  try {
+    const { roleNeeded, city, type, sortFavorites } = req.query;
+    const filter = {};
+    if (roleNeeded) filter.roleNeeded = { $in: roleNeeded.split(',') };
+    if (city) filter.city = city;
+    if (type) filter.type = type;
+
+    const posts = await PostCollection.find(filter)
+      .populate('author', 'name surname city role photo')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const userId = req.user?._id;
+    if (userId && posts.length) {
+      const ids = posts.map((p) => p._id);
+      const favs = await Favorite.find({
+        userId,
+        targetType: 'post',
+        targetId: { $in: ids },
+      })
+        .select('targetId')
+        .lean();
+      const favSet = new Set(favs.map((f) => String(f.targetId)));
+      posts.forEach((p) => (p.isFavorited = favSet.has(String(p._id))));
+
+      if (sortFavorites === '1') {
+        posts.sort((a, b) => (b.isFavorited ? 1 : 0) - (a.isFavorited ? 1 : 0));
+      }
+    }
+
+    if (!posts || posts.length === 0) {
+      throw createHttpError(404, 'No posts found');
+    }
+
+    res.json({
+      status: 200,
+      message: 'Posts fetched successfully',
+      data: posts,
+    });
+  } catch (err) {
+    next(err);
   }
-
-  res.json({
-    status: 200,
-    message: 'Posts fetched successfully',
-    data: posts,
-  });
 };
 
 // 📄 Получить пост по ID
-export const getPostByIdController = async (req, res) => {
-  const { id } = req.params;
+// export const getPostByIdController = async (req, res) => {
+//   const { id } = req.params;
 
-  const post = await PostCollection.findById(id)
-    .populate('author', 'name surname city photo role')
-    .populate('comments.author', 'name surname photo role');
+//   const post = await PostCollection.findById(id)
+//     .populate('author', 'name surname city photo role')
+//     .populate('comments.author', 'name surname photo role');
 
-  if (!post) {
-    throw createHttpError(404, 'Post not found');
+//   if (!post) {
+//     throw createHttpError(404, 'Post not found');
+//   }
+
+//   res.json({
+//     status: 200,
+//     message: 'Post fetched successfully',
+//     data: post,
+//   });
+// };
+export const getPostByIdController = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const post = await PostCollection.findById(id)
+      .populate('author', 'name surname city photo role')
+      .populate('comments.author', 'name surname photo role')
+      .lean();
+
+    if (!post) return next(createHttpError(404, 'Post not found'));
+
+    const userId = req.user?._id;
+    if (userId) {
+      const exists = await Favorite.findOne({
+        userId,
+        targetType: 'post',
+        targetId: id,
+      }).lean();
+      post.isFavorited = Boolean(exists);
+    } else {
+      post.isFavorited = false;
+    }
+
+    res.json({ status: 200, message: 'Post fetched successfully', data: post });
+  } catch (err) {
+    next(err);
   }
-
-  res.json({
-    status: 200,
-    message: 'Post fetched successfully',
-    data: post,
-  });
 };
 
 // ✏️ Обновить пост
@@ -153,30 +227,6 @@ export const toggleLikeController = async (req, res, next) => {
   }
 };
 
-// ⭐ Добавить / удалить из избранного
-export const toggleFavoriteController = async (req, res) => {
-  const { id } = req.params;
-  const userId = req.user._id;
-
-  const post = await PostCollection.findById(id);
-  if (!post) throw createHttpError(404, 'Post not found');
-
-  const isFavorite = post.favorites.includes(userId);
-
-  if (isFavorite) {
-    post.favorites.pull(userId);
-  } else {
-    post.favorites.push(userId);
-  }
-
-  await post.save();
-
-  res.json({
-    status: 200,
-    message: isFavorite ? 'Removed from favorites' : 'Added to favorites',
-    favoritesCount: post.favorites.length,
-  });
-};
 /// 💬 Добавить комментарий
 export const addCommentController = async (req, res) => {
   const { id } = req.params; // postId
@@ -305,4 +355,28 @@ export const deleteCommentController = async (req, res) => {
     status: 200,
     message: 'Comment deleted successfully',
   });
+};
+
+export const toggleFavoriteController = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user && req.user._id;
+    if (!userId) return next(createHttpError(401, 'User not authenticated'));
+
+    const result = await toggleFavoriteService({
+      userId,
+      targetType: 'post',
+      targetId: id,
+    });
+
+    res.json({
+      status: 200,
+      message: result.favorited
+        ? 'Added to favorites'
+        : 'Removed from favorites',
+      data: { favorited: result.favorited },
+    });
+  } catch (err) {
+    next(err);
+  }
 };
