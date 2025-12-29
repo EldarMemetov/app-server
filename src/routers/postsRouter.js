@@ -67,12 +67,12 @@ postsRouter.patch(
   checkBlocked,
   ctrlWrapper(postsController.toggleLikeController),
 );
-// postsRouter.patch(
-//   '/:id/favorite',
-//   authenticate,
-//   checkBlocked,
-//   ctrlWrapper(postsController.toggleFavoriteController),
-// );
+postsRouter.patch(
+  '/:id/favorite',
+  authenticate,
+  checkBlocked,
+  ctrlWrapper(postsController.toggleFavoriteController),
+);
 postsRouter.post(
   '/:id/comment',
   authenticate,
