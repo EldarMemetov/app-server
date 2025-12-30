@@ -66,19 +66,6 @@ postsRouter.delete(
   ctrlWrapper(postsController.deletePostController),
 );
 
-// postsRouter.patch(
-//   '/:id/like',
-//   authenticate,
-//   checkBlocked,
-//   ctrlWrapper(postsController.toggleLikeController),
-// );
-// postsRouter.patch(
-//   '/:id/favorite',
-//   authenticate,
-//   checkBlocked,
-//   ctrlWrapper(postsController.toggleFavoriteController),
-// );
-
 postsRouter.post(
   '/:id/comment',
   authenticate,
