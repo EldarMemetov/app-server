@@ -1,0 +1,188 @@
+import createHttpError from 'http-errors';
+import mongoose from 'mongoose';
+import Comment from '../db/models/Comment.js';
+import PostCollection from '../db/models/Post.js';
+
+const getPostIdFromParams = (params) => params.id || params.postId || null;
+const getCommentIdFromParams = (params) =>
+  params.commentId || params.id || null;
+
+export const addCommentController = async (req, res, next) => {
+  try {
+    const postId = getPostIdFromParams(req.params);
+    const userId = req.user && req.user._id;
+    const rawText = req.body?.text;
+
+    if (!userId) return next(createHttpError(401, 'User not authenticated'));
+    if (!postId || !mongoose.Types.ObjectId.isValid(postId))
+      return next(createHttpError(400, 'Invalid post id'));
+
+    const text = typeof rawText === 'string' ? rawText.trim() : '';
+    if (!text) return next(createHttpError(400, 'Comment text is required'));
+
+    const postExists = await PostCollection.exists({ _id: postId });
+    if (!postExists) return next(createHttpError(404, 'Post not found'));
+
+    const doc = await Comment.create({ postId, author: userId, text });
+
+    const populated = await Comment.findById(doc._id)
+      .populate('author', 'name surname photo role')
+      .lean();
+
+    // Emit to sockets in room for this post (if io available)
+    try {
+      const io = req.app?.get('io');
+      if (io) {
+        io.to(`post:${String(postId)}`).emit('comment:new', {
+          postId: String(postId),
+          comment: populated,
+        });
+      }
+    } catch (e) {
+      console.error('comment emit error (new):', e);
+    }
+
+    res.status(201).json({
+      status: 201,
+      message: 'Comment added successfully',
+      data: populated,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getCommentsController = async (req, res, next) => {
+  try {
+    const postId = getPostIdFromParams(req.params);
+    const page = Math.max(1, Number(req.query.page || 1));
+    const limit = Math.min(100, Number(req.query.limit || 20));
+    const skip = (page - 1) * limit;
+
+    if (!postId || !mongoose.Types.ObjectId.isValid(postId))
+      return next(createHttpError(400, 'Invalid post id'));
+
+    const query = { postId, deleted: false };
+
+    const [items, total] = await Promise.all([
+      Comment.find(query)
+        .populate('author', 'name surname photo role')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Comment.countDocuments(query),
+    ]);
+
+    res.json({
+      status: 200,
+      data: items,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updateCommentController = async (req, res, next) => {
+  try {
+    const commentId = getCommentIdFromParams(req.params);
+    const userId = req.user && req.user._id;
+    const rawText = req.body?.text;
+
+    if (!userId) return next(createHttpError(401, 'User not authenticated'));
+    if (!commentId || !mongoose.Types.ObjectId.isValid(commentId))
+      return next(createHttpError(400, 'Invalid comment id'));
+
+    const text = typeof rawText === 'string' ? rawText.trim() : '';
+    if (!text) return next(createHttpError(400, 'Comment text is required'));
+
+    const comment = await Comment.findById(commentId);
+    if (!comment) return next(createHttpError(404, 'Comment not found'));
+
+    if (
+      String(comment.author) !== String(userId) &&
+      req.user.role !== 'admin'
+    ) {
+      return next(createHttpError(403, 'You can edit only your comments'));
+    }
+
+    comment.text = text;
+    comment.updatedAt = new Date();
+    await comment.save();
+
+    const populated = await Comment.findById(comment._id)
+      .populate('author', 'name surname photo role')
+      .lean();
+
+    try {
+      const io = req.app?.get('io');
+      if (io) {
+        io.to(`post:${String(comment.postId)}`).emit('comment:updated', {
+          postId: String(comment.postId),
+          comment: populated,
+        });
+      }
+    } catch (e) {
+      console.error('comment emit error (updated):', e);
+    }
+
+    res.json({
+      status: 200,
+      message: 'Comment updated successfully',
+      data: populated,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const deleteCommentController = async (req, res, next) => {
+  try {
+    const commentId = getCommentIdFromParams(req.params);
+    const userId = req.user && req.user._id;
+
+    if (!userId) return next(createHttpError(401, 'User not authenticated'));
+    if (!commentId || !mongoose.Types.ObjectId.isValid(commentId))
+      return next(createHttpError(400, 'Invalid comment id'));
+
+    const comment = await Comment.findById(commentId);
+    if (!comment) return next(createHttpError(404, 'Comment not found'));
+
+    const post = await PostCollection.findById(comment.postId)
+      .select('author')
+      .lean();
+    const isPostAuthor = post && String(post.author) === String(userId);
+    const isCommentAuthor = String(comment.author) === String(userId);
+
+    if (!isCommentAuthor && !isPostAuthor && req.user.role !== 'admin') {
+      return next(
+        createHttpError(
+          403,
+          'You can delete only your comments or comments on your posts',
+        ),
+      );
+    }
+
+    comment.deleted = true;
+    await comment.save();
+
+    try {
+      const io = req.app?.get('io');
+      if (io) {
+        io.to(`post:${String(comment.postId)}`).emit('comment:deleted', {
+          postId: String(comment.postId),
+          commentId: String(comment._id),
+        });
+      }
+    } catch (e) {
+      console.error('comment emit error (deleted):', e);
+    }
+
+    res.json({ status: 200, message: 'Comment deleted successfully' });
+  } catch (err) {
+    next(err);
+  }
+};

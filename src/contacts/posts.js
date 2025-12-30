@@ -4,7 +4,7 @@ import createHttpError from 'http-errors';
 import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
 import { toggleLike } from './likesGeneric.js';
 import { toggleFavorite as toggleFavoriteService } from './favorites.js';
-
+import Comment from '../db/models/Comment.js';
 export const createPostWithMediaController = async (req, res) => {
   const { _id: userId } = req.user;
   if (!userId) throw createHttpError(401, 'Unauthorized');
@@ -44,29 +44,6 @@ export const createPostController = async (req, res) => {
     data: post,
   });
 };
-
-// export const getAllPostsController = async (req, res) => {
-//   const { roleNeeded, city, type } = req.query;
-
-//   const filter = {};
-//   if (roleNeeded) filter.roleNeeded = { $in: roleNeeded.split(',') };
-//   if (city) filter.city = city;
-//   if (type) filter.type = type;
-
-//   const posts = await PostCollection.find(filter)
-//     .populate('author', 'name surname city role photo')
-//     .sort({ createdAt: -1 });
-
-//   if (!posts || posts.length === 0) {
-//     throw createHttpError(404, 'No posts found');
-//   }
-
-//   res.json({
-//     status: 200,
-//     message: 'Posts fetched successfully',
-//     data: posts,
-//   });
-// };
 
 export const getAllPostsController = async (req, res, next) => {
   try {
@@ -113,24 +90,6 @@ export const getAllPostsController = async (req, res, next) => {
   }
 };
 
-// 📄 Получить пост по ID
-// export const getPostByIdController = async (req, res) => {
-//   const { id } = req.params;
-
-//   const post = await PostCollection.findById(id)
-//     .populate('author', 'name surname city photo role')
-//     .populate('comments.author', 'name surname photo role');
-
-//   if (!post) {
-//     throw createHttpError(404, 'Post not found');
-//   }
-
-//   res.json({
-//     status: 200,
-//     message: 'Post fetched successfully',
-//     data: post,
-//   });
-// };
 export const getPostByIdController = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -141,6 +100,12 @@ export const getPostByIdController = async (req, res, next) => {
 
     if (!post) return next(createHttpError(404, 'Post not found'));
 
+    const comments = await Comment.find({ postId: id, deleted: false })
+      .populate('author', 'name surname photo role')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    post.comments = comments;
     const userId = req.user?._id;
     if (userId) {
       const exists = await Favorite.findOne({
@@ -227,28 +192,6 @@ export const toggleLikeController = async (req, res, next) => {
   }
 };
 
-/// 💬 Добавить комментарий
-export const addCommentController = async (req, res) => {
-  const { id } = req.params; // postId
-  const userId = req.user._id;
-  const { text } = req.body;
-
-  if (!text?.trim()) throw createHttpError(400, 'Comment text is required');
-
-  const post = await PostCollection.findById(id);
-  if (!post) throw createHttpError(404, 'Post not found');
-
-  post.comments.push({ author: userId, text });
-  await post.save();
-
-  res.status(201).json({
-    status: 201,
-    message: 'Comment added successfully',
-    commentsCount: post.comments.length,
-    data: post.comments[post.comments.length - 1],
-  });
-};
-
 // 💼 Добавить / убрать заинтересованность
 export const toggleInterestedController = async (req, res) => {
   const { id } = req.params;
@@ -294,66 +237,6 @@ export const getFilteredPostsController = async (req, res) => {
     message: 'Filtered posts fetched successfully',
     count: posts.length,
     data: posts,
-  });
-};
-
-// ✏️ Изменить комментарий
-export const updateCommentController = async (req, res) => {
-  const { postId, commentId } = req.params;
-  const userId = req.user._id;
-  const { text } = req.body;
-
-  if (!text?.trim()) throw createHttpError(400, 'Comment text is required');
-
-  const post = await PostCollection.findById(postId);
-  if (!post) throw createHttpError(404, 'Post not found');
-
-  const comment = post.comments.id(commentId);
-  if (!comment) throw createHttpError(404, 'Comment not found');
-
-  if (comment.author.toString() !== userId.toString()) {
-    throw createHttpError(403, 'You can edit only your comments');
-  }
-
-  comment.text = text;
-  comment.updatedAt = new Date();
-  await post.save();
-
-  res.json({
-    status: 200,
-    message: 'Comment updated successfully',
-    data: comment,
-  });
-};
-
-// 🗑 Удалить комментарий
-export const deleteCommentController = async (req, res) => {
-  const { postId, commentId } = req.params;
-  const userId = req.user._id;
-
-  const post = await PostCollection.findById(postId);
-  if (!post) throw createHttpError(404, 'Post not found');
-
-  const comment = post.comments.id(commentId);
-  if (!comment) throw createHttpError(404, 'Comment not found');
-
-  // Удалить может либо автор комментария, либо автор поста
-  if (
-    comment.author.toString() !== userId.toString() &&
-    post.author.toString() !== userId.toString()
-  ) {
-    throw createHttpError(
-      403,
-      'You can delete only your comments or comments on your posts',
-    );
-  }
-
-  comment.deleteOne();
-  await post.save();
-
-  res.json({
-    status: 200,
-    message: 'Comment deleted successfully',
   });
 };
 

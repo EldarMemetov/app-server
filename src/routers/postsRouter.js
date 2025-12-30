@@ -10,8 +10,13 @@ import * as postMediaController from '../controllers/postMediaController.js';
 import upload from '../middlewares/uploadMiddleware.js';
 import { filterPostsController } from '../controllers/filterController.js';
 import * as postNotifications from '../contacts/postNotifications.js';
+
 import optionalAuthenticate from '../middlewares/optionalAuthenticate.js';
+
+import * as commentsController from '../controllers/commentsController.js';
+
 import * as likesController from '../controllers/likesController.js';
+
 const postsRouter = Router();
 
 postsRouter.get('/filter', ctrlWrapper(filterPostsController));
@@ -61,44 +66,53 @@ postsRouter.delete(
   ctrlWrapper(postsController.deletePostController),
 );
 
-postsRouter.patch(
-  '/:id/like',
-  authenticate,
-  checkBlocked,
-  ctrlWrapper(postsController.toggleLikeController),
-);
+// postsRouter.patch(
+//   '/:id/like',
+//   authenticate,
+//   checkBlocked,
+//   ctrlWrapper(postsController.toggleLikeController),
+// );
 // postsRouter.patch(
 //   '/:id/favorite',
 //   authenticate,
 //   checkBlocked,
 //   ctrlWrapper(postsController.toggleFavoriteController),
 // );
+
 postsRouter.post(
   '/:id/comment',
   authenticate,
   checkBlocked,
   validateBody(addCommentSchema),
-  ctrlWrapper(postsController.addCommentController),
+  ctrlWrapper(commentsController.addCommentController),
 );
-postsRouter.patch(
-  '/:id/interested',
-  authenticate,
-  checkBlocked,
-  ctrlWrapper(postsController.toggleInterestedController),
+
+postsRouter.get(
+  '/:id/comments',
+  optionalAuthenticate,
+  ctrlWrapper(commentsController.getCommentsController),
 );
+
 postsRouter.patch(
   '/:postId/comments/:commentId',
   authenticate,
   checkBlocked,
   validateBody(addCommentSchema),
-  ctrlWrapper(postsController.updateCommentController),
+  ctrlWrapper(commentsController.updateCommentController),
 );
 
 postsRouter.delete(
   '/:postId/comments/:commentId',
   authenticate,
   checkBlocked,
-  ctrlWrapper(postsController.deleteCommentController),
+  ctrlWrapper(commentsController.deleteCommentController),
+);
+
+postsRouter.patch(
+  '/:id/interested',
+  authenticate,
+  checkBlocked,
+  ctrlWrapper(postsController.toggleInterestedController),
 );
 
 postsRouter.patch(
