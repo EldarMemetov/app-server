@@ -45,6 +45,13 @@ postsRouter.post(
   ctrlWrapper(postsController.createPostController),
 );
 
+postsRouter.patch(
+  '/:id/like',
+  authenticate,
+  checkBlocked,
+  ctrlWrapper(postsController.toggleLikeController),
+);
+
 postsRouter.post(
   '/',
   authenticate,
