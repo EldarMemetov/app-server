@@ -6,12 +6,12 @@ import * as postsController from '../contacts/posts.js';
 import { addCommentSchema, createPostSchema } from '../validation/posts.js';
 import { applySchema } from '../validation/posts.js';
 import checkBlocked from '../middlewares/checkBlocked.js';
-import * as postMediaController from '../contacts/postMediaController.js';
+import * as postMediaController from '../controllers/postMediaController.js';
 import upload from '../middlewares/uploadMiddleware.js';
-import { filterPostsController } from '../contacts/filterController.js';
+import { filterPostsController } from '../controllers/filterController.js';
 import * as postNotifications from '../contacts/postNotifications.js';
 import optionalAuthenticate from '../middlewares/optionalAuthenticate.js';
-import * as likesController from '../contacts/likesController.js';
+import * as likesController from '../controllers/likesController.js';
 const postsRouter = Router();
 
 postsRouter.get('/filter', ctrlWrapper(filterPostsController));

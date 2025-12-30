@@ -9,7 +9,7 @@ import {
   getUserEventsController,
   updateEventController,
   deleteEventController,
-} from '../contacts/calendarController.js';
+} from '../controllers/calendarController.js';
 
 const calendarRouter = Router();
 

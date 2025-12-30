@@ -6,7 +6,7 @@ import upload from '../middlewares/uploadMiddleware.js';
 import {
   addPortfolioItemController,
   deletePortfolioItemController,
-} from '../contacts/portfolioController.js';
+} from '../controllers/portfolioController.js';
 
 const portfolioRouter = Router();
 

@@ -1,12 +1,12 @@
 // profilePublicRouter.js
 import { Router } from 'express';
 import ctrlWrapper from '../utils/ctrlWrapper.js';
-import * as profileController from '../contacts/profileController.js';
-import { filterUsersController } from '../contacts/filterController.js';
+import * as profileController from '../controllers/profileController.js';
+import { filterUsersController } from '../controllers/filterController.js';
 
 import authenticate from '../middlewares/authenticate.js';
 import optionalAuthenticate from '../middlewares/optionalAuthenticate.js';
-import * as likesController from '../contacts/likesController.js';
+import * as likesController from '../controllers/likesController.js';
 
 const router = Router();
 

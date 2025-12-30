@@ -1,8 +1,8 @@
 // contacts/likesController.js
 import createHttpError from 'http-errors';
-import * as likesService from './likes.js';
+import * as likesService from '../contacts/likes.js';
 import mongoose from 'mongoose';
-import { toggleLike } from './likesGeneric.js';
+import { toggleLike } from '../contacts/likesGeneric.js';
 import LikeCollection from '../db/models/like.js';
 import PostCollection from '../db/models/Post.js';
 export const likeUserController = async (req, res, next) => {
