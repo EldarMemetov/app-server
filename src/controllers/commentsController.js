@@ -59,6 +59,7 @@ export const addCommentController = async (req, res, next) => {
 
     const populated = await Comment.findById(doc._id)
       .populate('author', 'name surname photo role')
+      .populate('replyTo', 'name surname photo')
       .lean();
 
     try {
@@ -146,6 +147,7 @@ export const updateCommentController = async (req, res, next) => {
 
     const populated = await Comment.findById(comment._id)
       .populate('author', 'name surname photo role')
+      .populate('replyTo', 'name surname photo')
       .lean();
 
     try {
