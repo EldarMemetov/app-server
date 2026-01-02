@@ -3,8 +3,12 @@ import authenticate from '../middlewares/authenticate.js';
 import validateBody from '../utils/validateBody.js';
 import ctrlWrapper from '../utils/ctrlWrapper.js';
 import * as postsController from '../contacts/posts.js';
-import { addCommentSchema, createPostSchema } from '../validation/posts.js';
-import { applySchema } from '../validation/posts.js';
+import { createPostSchema, applySchema } from '../validation/posts.js';
+import {
+  addCommentSchema,
+  updateCommentSchema,
+} from '../validation/comments.js';
+
 import checkBlocked from '../middlewares/checkBlocked.js';
 import * as postMediaController from '../controllers/postMediaController.js';
 import upload from '../middlewares/uploadMiddleware.js';
@@ -16,6 +20,8 @@ import optionalAuthenticate from '../middlewares/optionalAuthenticate.js';
 import * as commentsController from '../controllers/commentsController.js';
 
 import * as likesController from '../controllers/likesController.js';
+
+import * as commentLikesController from '../controllers/commentLikesController.js';
 
 const postsRouter = Router();
 
@@ -91,7 +97,7 @@ postsRouter.patch(
   '/:postId/comments/:commentId',
   authenticate,
   checkBlocked,
-  validateBody(addCommentSchema),
+  validateBody(updateCommentSchema),
   ctrlWrapper(commentsController.updateCommentController),
 );
 
@@ -100,6 +106,13 @@ postsRouter.delete(
   authenticate,
   checkBlocked,
   ctrlWrapper(commentsController.deleteCommentController),
+);
+
+postsRouter.patch(
+  '/:postId/comments/:commentId/like',
+  authenticate,
+  checkBlocked,
+  ctrlWrapper(commentLikesController.toggleCommentLikeController),
 );
 
 postsRouter.patch(

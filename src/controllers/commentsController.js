@@ -2,16 +2,20 @@ import createHttpError from 'http-errors';
 import mongoose from 'mongoose';
 import Comment from '../db/models/Comment.js';
 import PostCollection from '../db/models/Post.js';
+import UserCollection from '../db/models/User.js';
 
-const getPostIdFromParams = (params) => params.id || params.postId || null;
 const getCommentIdFromParams = (params) =>
   params.commentId || params.id || null;
+
+const getPostIdFromParams = (params) => params.id || params.postId || null;
 
 export const addCommentController = async (req, res, next) => {
   try {
     const postId = getPostIdFromParams(req.params);
     const userId = req.user && req.user._id;
     const rawText = req.body?.text;
+    const parentComment = req.body?.parentComment ?? null;
+    const replyTo = req.body?.replyTo ?? null;
 
     if (!userId) return next(createHttpError(401, 'User not authenticated'));
     if (!postId || !mongoose.Types.ObjectId.isValid(postId))
@@ -23,13 +27,40 @@ export const addCommentController = async (req, res, next) => {
     const postExists = await PostCollection.exists({ _id: postId });
     if (!postExists) return next(createHttpError(404, 'Post not found'));
 
-    const doc = await Comment.create({ postId, author: userId, text });
+    let parent = null;
+    if (parentComment) {
+      if (!mongoose.Types.ObjectId.isValid(parentComment))
+        return next(createHttpError(400, 'Invalid parentComment id'));
+      parent = await Comment.findById(parentComment).select('postId').lean();
+      if (!parent)
+        return next(createHttpError(404, 'Parent comment not found'));
+      if (String(parent.postId) !== String(postId))
+        return next(
+          createHttpError(400, 'Parent comment belongs to another post'),
+        );
+    }
+
+    if (replyTo) {
+      if (!mongoose.Types.ObjectId.isValid(replyTo))
+        return next(createHttpError(400, 'Invalid replyTo id'));
+      const u = await UserCollection.findById(replyTo).select('_id').lean();
+      if (!u) return next(createHttpError(404, 'Reply-to user not found'));
+    }
+
+    const createData = {
+      postId,
+      author: userId,
+      text,
+      parentComment: parentComment || null,
+      replyTo: replyTo || null,
+    };
+
+    const doc = await Comment.create(createData);
 
     const populated = await Comment.findById(doc._id)
       .populate('author', 'name surname photo role')
       .lean();
 
-    // Emit to sockets in room for this post (if io available)
     try {
       const io = req.app?.get('io');
       if (io) {
@@ -51,7 +82,6 @@ export const addCommentController = async (req, res, next) => {
     next(err);
   }
 };
-
 export const getCommentsController = async (req, res, next) => {
   try {
     const postId = getPostIdFromParams(req.params);

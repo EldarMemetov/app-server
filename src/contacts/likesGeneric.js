@@ -4,10 +4,11 @@ import LikeCollection from '../db/models/like.js';
 import UserCollection from '../db/models/User.js';
 import PostCollection from '../db/models/Post.js';
 import { createNotification } from '../utils/notifications.js';
-
+import CommentCollection from '../db/models/Comment.js';
 const TARGET_MAP = {
   user: { model: UserCollection, getOwnerId: (doc) => doc._id },
   post: { model: PostCollection, getOwnerId: (doc) => doc.author },
+  comment: { model: CommentCollection, getOwnerId: (doc) => doc.author },
 };
 
 export const toggleLike = async ({
