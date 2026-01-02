@@ -97,6 +97,7 @@ export const getCommentsController = async (req, res, next) => {
     const [items, total] = await Promise.all([
       Comment.find(query)
         .populate('author', 'name surname photo role')
+        .populate('replyTo', 'name surname')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
