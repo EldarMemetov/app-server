@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import Comment from '../db/models/Comment.js';
 import PostCollection from '../db/models/Post.js';
 import UserCollection from '../db/models/User.js';
-
+import LikeCollection from '../db/models/like.js';
 const getCommentIdFromParams = (params) =>
   params.commentId || params.id || null;
 
@@ -105,7 +105,26 @@ export const getCommentsController = async (req, res, next) => {
         .lean(),
       Comment.countDocuments(query),
     ]);
+    const maybeUserId = req.user?._id;
+    if (maybeUserId && Array.isArray(items) && items.length > 0) {
+      const ids = items.map((c) => String(c._id));
+      const likes = await LikeCollection.find({
+        fromUserId: maybeUserId,
+        targetType: 'comment',
+        targetId: { $in: ids },
+      })
+        .select('targetId')
+        .lean();
 
+      const likedSet = new Set(likes.map((l) => String(l.targetId)));
+      items.forEach((c) => {
+        c.liked = likedSet.has(String(c._id));
+      });
+    } else {
+      items.forEach((c) => {
+        c.liked = false;
+      });
+    }
     res.json({
       status: 200,
       data: items,
