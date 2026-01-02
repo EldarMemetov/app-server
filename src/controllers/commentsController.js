@@ -4,10 +4,86 @@ import Comment from '../db/models/Comment.js';
 import PostCollection from '../db/models/Post.js';
 import UserCollection from '../db/models/User.js';
 import LikeCollection from '../db/models/like.js';
+import { createNotification } from '../utils/notifications.js';
 const getCommentIdFromParams = (params) =>
   params.commentId || params.id || null;
 
 const getPostIdFromParams = (params) => params.id || params.postId || null;
+
+// export const addCommentController = async (req, res, next) => {
+//   try {
+//     const postId = getPostIdFromParams(req.params);
+//     const userId = req.user && req.user._id;
+//     const rawText = req.body?.text;
+//     const parentComment = req.body?.parentComment ?? null;
+//     const replyTo = req.body?.replyTo ?? null;
+
+//     if (!userId) return next(createHttpError(401, 'User not authenticated'));
+//     if (!postId || !mongoose.Types.ObjectId.isValid(postId))
+//       return next(createHttpError(400, 'Invalid post id'));
+
+//     const text = typeof rawText === 'string' ? rawText.trim() : '';
+//     if (!text) return next(createHttpError(400, 'Comment text is required'));
+
+//     const postExists = await PostCollection.exists({ _id: postId });
+//     if (!postExists) return next(createHttpError(404, 'Post not found'));
+
+//     let parent = null;
+//     if (parentComment) {
+//       if (!mongoose.Types.ObjectId.isValid(parentComment))
+//         return next(createHttpError(400, 'Invalid parentComment id'));
+//       parent = await Comment.findById(parentComment).select('postId').lean();
+//       if (!parent)
+//         return next(createHttpError(404, 'Parent comment not found'));
+//       if (String(parent.postId) !== String(postId))
+//         return next(
+//           createHttpError(400, 'Parent comment belongs to another post'),
+//         );
+//     }
+
+//     if (replyTo) {
+//       if (!mongoose.Types.ObjectId.isValid(replyTo))
+//         return next(createHttpError(400, 'Invalid replyTo id'));
+//       const u = await UserCollection.findById(replyTo).select('_id').lean();
+//       if (!u) return next(createHttpError(404, 'Reply-to user not found'));
+//     }
+
+//     const createData = {
+//       postId,
+//       author: userId,
+//       text,
+//       parentComment: parentComment || null,
+//       replyTo: replyTo || null,
+//     };
+
+//     const doc = await Comment.create(createData);
+
+//     const populated = await Comment.findById(doc._id)
+//       .populate('author', 'name surname photo role')
+//       .populate('replyTo', 'name surname photo')
+//       .lean();
+
+//     try {
+//       const io = req.app?.get('io');
+//       if (io) {
+//         io.to(`post:${String(postId)}`).emit('comment:new', {
+//           postId: String(postId),
+//           comment: populated,
+//         });
+//       }
+//     } catch (e) {
+//       console.error('comment emit error (new):', e);
+//     }
+
+//     res.status(201).json({
+//       status: 201,
+//       message: 'Comment added successfully',
+//       data: populated,
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
 
 export const addCommentController = async (req, res, next) => {
   try {
@@ -31,9 +107,14 @@ export const addCommentController = async (req, res, next) => {
     if (parentComment) {
       if (!mongoose.Types.ObjectId.isValid(parentComment))
         return next(createHttpError(400, 'Invalid parentComment id'));
-      parent = await Comment.findById(parentComment).select('postId').lean();
+
+      parent = await Comment.findById(parentComment)
+        .select('postId author')
+        .lean();
+
       if (!parent)
         return next(createHttpError(404, 'Parent comment not found'));
+
       if (String(parent.postId) !== String(postId))
         return next(
           createHttpError(400, 'Parent comment belongs to another post'),
@@ -43,24 +124,42 @@ export const addCommentController = async (req, res, next) => {
     if (replyTo) {
       if (!mongoose.Types.ObjectId.isValid(replyTo))
         return next(createHttpError(400, 'Invalid replyTo id'));
+
       const u = await UserCollection.findById(replyTo).select('_id').lean();
       if (!u) return next(createHttpError(404, 'Reply-to user not found'));
     }
 
-    const createData = {
+    const doc = await Comment.create({
       postId,
       author: userId,
       text,
       parentComment: parentComment || null,
       replyTo: replyTo || null,
-    };
-
-    const doc = await Comment.create(createData);
+    });
 
     const populated = await Comment.findById(doc._id)
       .populate('author', 'name surname photo role')
       .populate('replyTo', 'name surname photo')
       .lean();
+
+    // 🔔 уведомление автору комментария, если это ответ
+    if (parent && String(parent.author) !== String(userId)) {
+      await createNotification({
+        user: parent.author,
+        fromUser: userId,
+        type: 'comment',
+        key: `reply_comment_${doc._id}`,
+        title: `${req.user.name} replied to your comment`,
+        message: text,
+        meta: {
+          postId: String(postId),
+          commentId: String(doc._id),
+          fromUserId: String(userId),
+        },
+        unique: true,
+        uniqueMetaKeys: ['commentId'],
+      });
+    }
 
     try {
       const io = req.app?.get('io');
@@ -83,6 +182,7 @@ export const addCommentController = async (req, res, next) => {
     next(err);
   }
 };
+
 export const getCommentsController = async (req, res, next) => {
   try {
     const postId = getPostIdFromParams(req.params);
