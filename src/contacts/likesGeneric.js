@@ -120,6 +120,7 @@
 //         let title = '',
 //           message = '',
 //           meta = {};
+
 //         if (targetType === 'user') {
 //           title = `${fromUser?.name || 'User'} liked your profile`;
 //           message = `${fromUser?.name || ''} ${fromUser?.surname || ''}`.trim();
@@ -132,6 +133,13 @@
 //           message = `${fromUser?.name || ''} ${fromUser?.surname || ''}`.trim();
 //           meta = {
 //             postUrl: `/posts/${String(targetId)}`,
+//             fromUserId: String(fromUserId),
+//           };
+//         } else if (targetType === 'comment') {
+//           title = `${fromUser?.name || 'User'} liked your comment`;
+//           message = `${fromUser?.name || ''} ${fromUser?.surname || ''}`.trim();
+//           meta = {
+//             commentId: String(targetId),
 //             fromUserId: String(fromUserId),
 //           };
 //         }
@@ -173,7 +181,7 @@ import createHttpError from 'http-errors';
 import LikeCollection from '../db/models/like.js';
 import UserCollection from '../db/models/User.js';
 import PostCollection from '../db/models/Post.js';
-import { createNotification } from '../utils/notifications.js';
+import { NotificationService } from '../utils/notificationService.js';
 import CommentCollection from '../db/models/Comment.js';
 const TARGET_MAP = {
   user: { model: UserCollection, getOwnerId: (doc) => doc._id },
@@ -219,7 +227,6 @@ export const toggleLike = async ({
     let liked;
     if (existing) {
       await LikeCollection.deleteOne({ _id: existing._id }).session(session);
-
       if (map && typeof targetDoc.likesCount !== 'undefined') {
         await map.model.findByIdAndUpdate(
           targetId,
@@ -232,7 +239,6 @@ export const toggleLike = async ({
       await LikeCollection.create([{ fromUserId, targetType, targetId }], {
         session,
       });
-
       if (map && typeof targetDoc.likesCount !== 'undefined') {
         await map.model.findByIdAndUpdate(
           targetId,
@@ -249,14 +255,13 @@ export const toggleLike = async ({
         .findById(targetId)
         .select('likesCount')
         .session(session);
-      if (typeof refreshed?.likesCount === 'number') {
-        likesCount = refreshed.likesCount;
-      } else {
-        likesCount = await LikeCollection.countDocuments({
-          targetType,
-          targetId,
-        }).session(session);
-      }
+      likesCount =
+        typeof refreshed?.likesCount === 'number'
+          ? refreshed.likesCount
+          : await LikeCollection.countDocuments({
+              targetType,
+              targetId,
+            }).session(session);
     } else {
       likesCount = await LikeCollection.countDocuments({
         targetType,
@@ -277,58 +282,10 @@ export const toggleLike = async ({
         fromUserId: String(fromUserId),
       };
       if (targetType === 'user') payload.toUserId = String(targetId);
-
-      if (io?.sendLikeUpdate) {
-        io.sendLikeUpdate(payload, ownerId);
-      }
+      if (io?.sendLikeUpdate) io.sendLikeUpdate(payload, ownerId);
 
       if (ownerId && String(ownerId) !== String(fromUserId)) {
-        const fromUser = await UserCollection.findById(fromUserId).select(
-          'name surname photo',
-        );
-
-        let title = '',
-          message = '',
-          meta = {};
-
-        if (targetType === 'user') {
-          title = `${fromUser?.name || 'User'} liked your profile`;
-          message = `${fromUser?.name || ''} ${fromUser?.surname || ''}`.trim();
-          meta = {
-            profileUrl: `/talents/${String(fromUserId)}`,
-            fromUserId: String(fromUserId),
-          };
-        } else if (targetType === 'post') {
-          title = `${fromUser?.name || 'User'} liked your post`;
-          message = `${fromUser?.name || ''} ${fromUser?.surname || ''}`.trim();
-          meta = {
-            postUrl: `/posts/${String(targetId)}`,
-            fromUserId: String(fromUserId),
-          };
-        } else if (targetType === 'comment') {
-          title = `${fromUser?.name || 'User'} liked your comment`;
-          message = `${fromUser?.name || ''} ${fromUser?.surname || ''}`.trim();
-          meta = {
-            commentId: String(targetId),
-            fromUserId: String(fromUserId),
-          };
-        }
-
-        const notifKey = `like_${targetType}_${String(fromUserId)}_${String(
-          targetId,
-        )}`;
-
-        await createNotification({
-          user: ownerId,
-          fromUser: fromUserId,
-          type: 'like',
-          key: notifKey,
-          title,
-          message,
-          meta,
-          unique: true,
-          uniqueMetaKeys: ['fromUserId'],
-        });
+        await NotificationService.like({ fromUserId, targetType, targetDoc });
       }
     } catch (emitErr) {
       console.error('like emit/notification error:', emitErr);
