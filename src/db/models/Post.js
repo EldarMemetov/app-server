@@ -1,22 +1,28 @@
 import { Schema, model } from 'mongoose';
+import { roles } from '../../constants/roles.js';
+
+const roleSlotSchema = new Schema(
+  {
+    role: { type: String, enum: roles, required: true },
+    required: { type: Number, default: 1 },
+    assigned: [{ type: Schema.Types.ObjectId, ref: 'user' }],
+  },
+  { _id: false },
+);
 
 const postSchema = new Schema(
   {
-    author: {
-      type: Schema.Types.ObjectId,
-      ref: 'user',
-      required: true,
-    },
+    author: { type: Schema.Types.ObjectId, ref: 'user', required: true },
     title: { type: String, required: true, trim: true },
     description: { type: String, required: true },
     media: [
       {
         type: { type: String, enum: ['photo', 'video'], required: true },
-        url: { type: String, required: true },
-        public_id: { type: String },
+        url: String,
+        public_id: String,
       },
     ],
-    roleNeeded: { type: [String], default: [] },
+    roleSlots: { type: [roleSlotSchema], default: [] },
     country: { type: String, required: true },
     city: { type: String, required: true },
     date: { type: Date },
@@ -24,41 +30,24 @@ const postSchema = new Schema(
       type: String,
       enum: ['paid', 'tfp', 'collaboration'],
       default: 'tfp',
-      price: { type: Number, default: 0 },
     },
+    price: { type: Number, default: 0 },
 
     status: {
       type: String,
       enum: ['open', 'in_progress', 'completed', 'canceled'],
       default: 'open',
     },
-    candidates: [
-      {
-        user: { type: Schema.Types.ObjectId, ref: 'user', required: true },
-        message: { type: String, default: '' },
-        createdAt: { type: Date, default: Date.now },
-      },
-    ],
-    assignedTo: {
-      type: [Schema.Types.ObjectId],
-      ref: 'user',
-      default: [],
-    },
+
+    applicationsCount: { type: Number, default: 0 },
+    assignedTo: [{ type: Schema.Types.ObjectId, ref: 'user' }],
+    maxAssigned: { type: Number, default: 5 },
 
     likesCount: { type: Number, default: 0 },
     favorites: [{ type: Schema.Types.ObjectId, ref: 'user' }],
-    comments: [
-      {
-        author: { type: Schema.Types.ObjectId, ref: 'user', required: true },
-        text: { type: String, required: true },
-        createdAt: { type: Date, default: Date.now },
-        updatedAt: { type: Date },
-      },
-    ],
     interestedUsers: [{ type: Schema.Types.ObjectId, ref: 'user' }],
   },
   { timestamps: true, versionKey: false },
 );
 
-const PostCollection = model('post', postSchema);
-export default PostCollection;
+export default model('post', postSchema);
