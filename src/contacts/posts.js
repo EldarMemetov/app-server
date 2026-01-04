@@ -226,12 +226,45 @@ export const getAllPostsController = async (req, res, next) => {
   }
 };
 
+// export const getPostByIdController = async (req, res, next) => {
+//   try {
+//     const { id } = req.params;
+//     const post = await PostCollection.findById(id)
+//       .populate('author', 'name surname city photo role')
+//       .populate('comments.author', 'name surname photo role')
+//       .lean();
+
+//     if (!post) return next(createHttpError(404, 'Post not found'));
+
+//     const comments = await Comment.find({ postId: id, deleted: false })
+//       .populate('author', 'name surname photo role')
+//       .sort({ createdAt: -1 })
+//       .lean();
+
+//     post.comments = comments;
+//     const userId = req.user?._id;
+//     if (userId) {
+//       const exists = await Favorite.findOne({
+//         userId,
+//         targetType: 'post',
+//         targetId: id,
+//       }).lean();
+//       post.isFavorited = Boolean(exists);
+//     } else {
+//       post.isFavorited = false;
+//     }
+
+//     res.json({ status: 200, message: 'Post fetched successfully', data: post });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
 export const getPostByIdController = async (req, res, next) => {
   try {
     const { id } = req.params;
+
     const post = await PostCollection.findById(id)
       .populate('author', 'name surname city photo role')
-      .populate('comments.author', 'name surname photo role')
       .lean();
 
     if (!post) return next(createHttpError(404, 'Post not found'));
@@ -242,6 +275,7 @@ export const getPostByIdController = async (req, res, next) => {
       .lean();
 
     post.comments = comments;
+
     const userId = req.user?._id;
     if (userId) {
       const exists = await Favorite.findOne({
@@ -259,7 +293,6 @@ export const getPostByIdController = async (req, res, next) => {
     next(err);
   }
 };
-
 // ✏️ Обновить пост
 export const updatePostController = async (req, res) => {
   const { id } = req.params;
