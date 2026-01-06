@@ -78,7 +78,12 @@ postsRouter.delete(
   checkBlocked,
   ctrlWrapper(postsController.deletePostController),
 );
-
+postsRouter.delete(
+  '/:id/media/:mediaId',
+  authenticate,
+  checkBlocked,
+  ctrlWrapper(postMediaController.deletePostMediaController),
+);
 postsRouter.post(
   '/:id/comment',
   authenticate,

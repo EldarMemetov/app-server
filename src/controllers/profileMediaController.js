@@ -3,8 +3,33 @@ import {
   saveFileToCloudinary,
   deleteFromCloudinary,
 } from '../utils/saveFileToCloudinary.js';
+import fs from 'fs/promises';
+import { env } from '../utils/env.js';
+// export const uploadProfilePhotoController = async (req, res) => {
+//   const { _id } = req.user;
+//   const user = await UserCollection.findById(_id);
+//   if (!user) return res.status(404).json({ message: 'User not found' });
 
-// === Загрузка или смена аватарки ===
+//   if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+
+//   if (user.photoPublicId) {
+//     await deleteFromCloudinary(user.photoPublicId);
+//   }
+
+//   const { url, public_id } = await saveFileToCloudinary(req.file);
+
+//   user.photo = url;
+//   user.photoPublicId = public_id;
+//   await user.save();
+
+//   res.status(200).json({
+//     status: 200,
+//     message: 'Profile photo updated successfully',
+//     data: { photo: user.photo },
+//   });
+// };
+const MAX_IMAGE_BYTES = Number(env('MAX_IMAGE_BYTES', 5 * 1024 * 1024));
+
 export const uploadProfilePhotoController = async (req, res) => {
   const { _id } = req.user;
   const user = await UserCollection.findById(_id);
@@ -12,25 +37,67 @@ export const uploadProfilePhotoController = async (req, res) => {
 
   if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
-  // Если было старое фото — удаляем
-  if (user.photoPublicId) {
-    await deleteFromCloudinary(user.photoPublicId);
+  const mimetype = req.file.mimetype || '';
+  if (!mimetype.startsWith('image/')) {
+    try {
+      await fs.unlink(req.file.path).catch(() => {});
+    } catch (err) {
+      console.warn('Failed to remove temp file', err);
+    }
+    return res.status(400).json({ message: 'Uploaded file is not an image' });
   }
 
-  const { url, public_id } = await saveFileToCloudinary(req.file);
+  try {
+    const stat = await fs.stat(req.file.path);
+    if (stat.size > MAX_IMAGE_BYTES) {
+      await fs.unlink(req.file.path).catch(() => {});
+      return res
+        .status(400)
+        .json({ message: `Image too large (max ${MAX_IMAGE_BYTES} bytes)` });
+    }
+  } catch (statErr) {
+    console.warn('Cannot stat uploaded file', statErr);
+  }
 
-  user.photo = url;
-  user.photoPublicId = public_id;
+  let uploadResult;
+  try {
+    uploadResult = await saveFileToCloudinary(req.file);
+  } catch (uploadErr) {
+    console.error('Failed upload to Cloudinary', uploadErr);
+
+    try {
+      await fs.unlink(req.file.path).catch(() => {});
+    } catch (err) {
+      console.warn('Failed to remove temp file', err);
+    }
+    return res.status(500).json({ message: 'Failed to upload profile photo' });
+  }
+
+  const newUrl = uploadResult.url;
+  const newPublicId = uploadResult.public_id;
+
+  const oldPublicId = user.photoPublicId || null;
+  user.photo = newUrl;
+  user.photoPublicId = newPublicId;
   await user.save();
 
-  res.status(200).json({
+  if (oldPublicId && oldPublicId !== newPublicId) {
+    try {
+      await deleteFromCloudinary(oldPublicId);
+    } catch (delErr) {
+      console.warn(
+        'Failed to delete old profile photo from Cloudinary',
+        delErr,
+      );
+    }
+  }
+
+  return res.status(200).json({
     status: 200,
     message: 'Profile photo updated successfully',
     data: { photo: user.photo },
   });
 };
-
-// === Добавление фото/видео в портфолио ===
 export const addPortfolioItemController = async (req, res) => {
   const { _id } = req.user;
   if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
@@ -51,7 +118,6 @@ export const addPortfolioItemController = async (req, res) => {
   });
 };
 
-// === Удаление элемента из портфолио ===
 export const deletePortfolioItemController = async (req, res) => {
   const { _id } = req.user;
   const { itemId } = req.params;
@@ -75,19 +141,17 @@ export const deletePortfolioItemController = async (req, res) => {
     message: 'Portfolio item deleted successfully',
   });
 };
-// === Удаление фото профиля ===
+
 export const deleteProfilePhotoController = async (req, res) => {
   const { _id } = req.user;
   const user = await UserCollection.findById(_id);
 
   if (!user) return res.status(404).json({ message: 'User not found' });
 
-  // Удаляем с Cloudinary
   if (user.photoPublicId) {
     await deleteFromCloudinary(user.photoPublicId);
   }
 
-  // Обнуляем фото в базе
   user.photo = '';
   user.photoPublicId = '';
   await user.save();

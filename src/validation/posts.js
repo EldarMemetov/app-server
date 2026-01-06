@@ -22,6 +22,7 @@ export const createPostSchema = Joi.object({
       }),
     )
     .optional(),
+  
   country: Joi.string().min(2).max(100).required(),
   city: Joi.string().min(2).max(50).required(),
   date: Joi.date().required(),
