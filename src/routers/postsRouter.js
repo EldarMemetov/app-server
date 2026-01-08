@@ -32,6 +32,11 @@ postsRouter.get(
   ctrlWrapper(postsController.getAllPostsController),
 );
 postsRouter.get(
+  '/mine',
+  authenticate,
+  ctrlWrapper(postsController.getMyPostsController),
+);
+postsRouter.get(
   '/:id',
   optionalAuthenticate,
   ctrlWrapper(postsController.getPostByIdController),
@@ -154,12 +159,6 @@ postsRouter.post(
   checkBlocked,
   upload.array('files', 5),
   ctrlWrapper(postMediaController.uploadPostMediaController),
-);
-
-postsRouter.get(
-  '/mine',
-  authenticate,
-  ctrlWrapper(postsController.getMyPostsController),
 );
 
 export default postsRouter;
