@@ -156,4 +156,10 @@ postsRouter.post(
   ctrlWrapper(postMediaController.uploadPostMediaController),
 );
 
+postsRouter.get(
+  '/mine',
+  authenticate,
+  ctrlWrapper(postsController.getMyPostsController),
+);
+
 export default postsRouter;

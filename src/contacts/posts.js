@@ -327,7 +327,54 @@ export const toggleLikeController = async (req, res, next) => {
     return next(err);
   }
 };
+export const getMyPostsController = async (req, res, next) => {
+  try {
+    const userId = req.user && req.user._id;
+    if (!userId) return next(createHttpError(401, 'User not authenticated'));
 
+    const page = Math.max(1, Number(req.query.page || 1));
+    const limit = Math.min(100, Number(req.query.limit || 20));
+    const skip = (page - 1) * limit;
+    const sortParam = req.query.sort || '-createdAt';
+    const filter = { author: userId };
+    if (req.query.status) filter.status = req.query.status;
+    if (req.query.city) filter.city = req.query.city;
+    if (req.query.type) filter.type = req.query.type;
+
+    const projection = {
+      title: 1,
+      createdAt: 1,
+      country: 1,
+      city: 1,
+      date: 1,
+      status: 1,
+      media: 1,
+      likesCount: 1,
+      interestedUsers: 1,
+      roleSlots: 1,
+      maxAssigned: 1,
+    };
+
+    const [items, total] = await Promise.all([
+      PostCollection.find(filter, projection)
+        .sort(sortParam)
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      PostCollection.countDocuments(filter),
+    ]);
+
+    res.json({
+      status: 200,
+      data: items,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    next(err);
+  }
+};
 // 💼 Добавить / убрать заинтересованность
 export const toggleInterestedController = async (req, res) => {
   const { id } = req.params;

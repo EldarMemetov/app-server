@@ -5,29 +5,7 @@ import {
 } from '../utils/saveFileToCloudinary.js';
 import fs from 'fs/promises';
 import { env } from '../utils/env.js';
-// export const uploadProfilePhotoController = async (req, res) => {
-//   const { _id } = req.user;
-//   const user = await UserCollection.findById(_id);
-//   if (!user) return res.status(404).json({ message: 'User not found' });
 
-//   if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
-
-//   if (user.photoPublicId) {
-//     await deleteFromCloudinary(user.photoPublicId);
-//   }
-
-//   const { url, public_id } = await saveFileToCloudinary(req.file);
-
-//   user.photo = url;
-//   user.photoPublicId = public_id;
-//   await user.save();
-
-//   res.status(200).json({
-//     status: 200,
-//     message: 'Profile photo updated successfully',
-//     data: { photo: user.photo },
-//   });
-// };
 const MAX_IMAGE_BYTES = Number(env('MAX_IMAGE_BYTES', 5 * 1024 * 1024));
 
 export const uploadProfilePhotoController = async (req, res) => {
