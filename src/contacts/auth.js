@@ -1,4 +1,5 @@
-import bcrypt from 'bcrypt';
+// import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 
 import createHttpError from 'http-errors';
@@ -34,23 +35,82 @@ const createSession = () => {
   };
 };
 
+// export const signup = async (payload) => {
+//   const { email, password } = payload;
+//   const user = await UserCollection.findOne({ email });
+//   if (user) {
+//     throw createHttpError(409, 'Email already exist');
+//   }
+
+//   const hashPassword = await bcrypt.hash(password, 10);
+
+//   const data = await UserCollection.create({
+//     ...payload,
+//     password: hashPassword,
+//   });
+//   delete data._doc.password;
+//   return data._doc;
+// };
+
 export const signup = async (payload) => {
-  const { email, password } = payload;
-  const user = await UserCollection.findOne({ email });
-  if (user) {
+  const {
+    email,
+    password,
+    name,
+    surname,
+    country,
+    city,
+    roles: incomingRoles,
+    role,
+  } = payload || {};
+
+  if (!email || !password || !name || !surname || !country || !city) {
+    throw createHttpError(
+      400,
+      'Missing required fields: email, password, name, surname, country, city are required',
+    );
+  }
+
+  let roles = [];
+  if (Array.isArray(incomingRoles) && incomingRoles.length > 0) {
+    roles = incomingRoles;
+  } else if (role) {
+    roles = Array.isArray(role) ? role : [role];
+  }
+
+  if (!roles || roles.length === 0) {
+    throw createHttpError(400, 'At least one role is required');
+  }
+
+  const existing = await UserCollection.findOne({ email }).lean();
+  if (existing) {
     throw createHttpError(409, 'Email already exist');
   }
 
   const hashPassword = await bcrypt.hash(password, 10);
 
-  const data = await UserCollection.create({
-    ...payload,
-    password: hashPassword,
-  });
-  delete data._doc.password;
-  return data._doc;
-};
+  try {
+    const created = await UserCollection.create({
+      ...payload,
+      password: hashPassword,
+      roles,
+    });
 
+    const userObj = created.toObject ? created.toObject() : created;
+    delete userObj.password;
+    return userObj;
+  } catch (err) {
+    if (err && err.code === 11000) {
+      throw createHttpError(409, 'Email already exist');
+    }
+
+    if (err && err.name === 'ValidationError') {
+      throw createHttpError(400, err.message);
+    }
+
+    throw err;
+  }
+};
 export const signin = async (payload) => {
   const { email, password } = payload;
   const user = await UserCollection.findOne({ email });
