@@ -36,6 +36,20 @@ const normalizeRoleSlots = (body) => {
     .filter((s) => roles.includes(s.role) && s.required > 0);
   return roleSlots;
 };
+const isDateInPastBerlin = (input) => {
+  if (!input) return false;
+  const parsed = new Date(input);
+  if (isNaN(parsed.getTime())) return false;
+
+  const berlinDateStr = new Date().toLocaleDateString('en-CA', {
+    timeZone: 'Europe/Berlin',
+  });
+
+  const berlinToday = new Date(berlinDateStr);
+  const parsedDateOnly = new Date(parsed.toISOString().slice(0, 10));
+
+  return parsedDateOnly < berlinToday;
+};
 
 export const createPostWithMediaController = async (req, res, next) => {
   try {
@@ -57,6 +71,20 @@ export const createPostWithMediaController = async (req, res, next) => {
 
     const roleSlots = normalizeRoleSlots(req.body);
 
+    if (!Array.isArray(roleSlots) || roleSlots.length === 0) {
+      return next(createHttpError(400, 'At least one role must be specified'));
+    }
+
+    if (date) {
+      const parsed = new Date(date);
+      if (isNaN(parsed.getTime()))
+        return next(createHttpError(400, 'Invalid date format'));
+
+      if (isDateInPastBerlin(parsed)) {
+        return next(createHttpError(400, 'Date cannot be in the past'));
+      }
+    }
+
     const postData = {
       author: userId,
       title: String(title).trim(),
@@ -70,10 +98,7 @@ export const createPostWithMediaController = async (req, res, next) => {
     };
 
     if (date) {
-      const parsed = new Date(date);
-      if (isNaN(parsed.getTime()))
-        return next(createHttpError(400, 'Invalid date format'));
-      postData.date = parsed;
+      postData.date = new Date(date);
     }
 
     const newPost = await PostCollection.create(postData);
@@ -121,7 +146,6 @@ export const createPostWithMediaController = async (req, res, next) => {
     next(err);
   }
 };
-
 export const createPostController = async (req, res, next) => {
   try {
     const { _id: userId } = req.user;
@@ -149,6 +173,20 @@ export const createPostController = async (req, res, next) => {
       roleNeeded,
     });
 
+    if (!Array.isArray(roleSlots) || roleSlots.length === 0) {
+      return next(createHttpError(400, 'At least one role must be specified'));
+    }
+
+    if (date) {
+      const parsed = new Date(date);
+      if (Number.isNaN(parsed.getTime())) {
+        return next(createHttpError(400, 'Invalid date format'));
+      }
+      if (isDateInPastBerlin(parsed)) {
+        return next(createHttpError(400, 'Date cannot be in the past'));
+      }
+    }
+
     const createData = {
       author: userId,
       title: String(title).trim(),
@@ -162,11 +200,7 @@ export const createPostController = async (req, res, next) => {
     };
 
     if (date) {
-      const parsed = new Date(date);
-      if (Number.isNaN(parsed.getTime())) {
-        return next(createHttpError(400, 'Invalid date format'));
-      }
-      createData.date = parsed;
+      createData.date = new Date(date);
     }
 
     const post = await PostCollection.create(createData);
@@ -180,6 +214,221 @@ export const createPostController = async (req, res, next) => {
     next(err);
   }
 };
+export const updatePostController = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    const post = await PostCollection.findById(id);
+    if (!post) return next(createHttpError(404, 'Post not found'));
+
+    if (post.author.toString() !== userId.toString()) {
+      return next(createHttpError(403, 'You can edit only your own posts'));
+    }
+
+    const {
+      title,
+      description,
+      country,
+      city,
+      date,
+      type,
+      price,
+      maxAssigned,
+      roleSlots: incomingRoleSlots,
+      roleNeeded,
+    } = req.body;
+
+    const roleSlots = normalizeRoleSlots({
+      roleSlots: incomingRoleSlots,
+      roleNeeded,
+    });
+
+    if (
+      (incomingRoleSlots !== undefined || roleNeeded !== undefined) &&
+      (!Array.isArray(roleSlots) || roleSlots.length === 0)
+    ) {
+      return next(createHttpError(400, 'At least one role must be specified'));
+    }
+
+    const updateData = {};
+
+    if (title !== undefined) updateData.title = String(title).trim();
+    if (description !== undefined) updateData.description = description;
+    if (country !== undefined) updateData.country = country;
+    if (city !== undefined) updateData.city = city;
+    if (type !== undefined) updateData.type = type;
+    if (price !== undefined) updateData.price = Number(price);
+    if (maxAssigned !== undefined) updateData.maxAssigned = Number(maxAssigned);
+    if (roleSlots && roleSlots.length > 0) updateData.roleSlots = roleSlots;
+
+    if (date !== undefined) {
+      const parsed = new Date(date);
+      if (isNaN(parsed.getTime()))
+        return next(createHttpError(400, 'Invalid date format'));
+      if (isDateInPastBerlin(parsed)) {
+        return next(createHttpError(400, 'Date cannot be in the past'));
+      }
+      updateData.date = parsed;
+    }
+
+    const updatedPost = await PostCollection.findByIdAndUpdate(id, updateData, {
+      new: true,
+    });
+
+    res.json({
+      status: 200,
+      message: 'Post updated successfully',
+      data: updatedPost,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// export const createPostWithMediaController = async (req, res, next) => {
+//   try {
+//     const { _id: userId } = req.user;
+//     if (!userId) return next(createHttpError(401, 'Unauthorized'));
+
+//     const {
+//       title,
+//       description,
+//       country,
+//       city,
+//       date,
+//       type,
+//       price,
+//       maxAssigned,
+//     } = req.body;
+//     if (!title || !description || !country || !city)
+//       return next(createHttpError(400, 'Missing required fields'));
+
+//     const roleSlots = normalizeRoleSlots(req.body);
+
+//     const postData = {
+//       author: userId,
+//       title: String(title).trim(),
+//       description: String(description),
+//       country: String(country),
+//       city: String(city),
+//       type: type || 'tfp',
+//       price: Number(price) || 0,
+//       roleSlots,
+//       maxAssigned: typeof maxAssigned === 'number' ? maxAssigned : 5,
+//     };
+
+//     if (date) {
+//       const parsed = new Date(date);
+//       if (isNaN(parsed.getTime()))
+//         return next(createHttpError(400, 'Invalid date format'));
+//       postData.date = parsed;
+//     }
+
+//     const newPost = await PostCollection.create(postData);
+
+//     if (req.files && req.files.length > 0) {
+//       if (req.files.length > 5) {
+//         return next(createHttpError(400, 'Too many files (max 5)'));
+//       }
+
+//       const uploadedMedia = [];
+//       try {
+//         for (const file of req.files) {
+//           if (
+//             !file.mimetype.startsWith('image') &&
+//             !file.mimetype.startsWith('video')
+//           ) {
+//             throw createHttpError(400, 'Invalid file type');
+//           }
+//           const { url, public_id } = await saveFileToCloudinary(file);
+//           const mediaType = file.mimetype.startsWith('video')
+//             ? 'video'
+//             : 'photo';
+//           uploadedMedia.push({ type: mediaType, url, public_id });
+//         }
+//       } catch (uploadErr) {
+//         console.error('Upload error:', uploadErr);
+//         return next(createHttpError(500, 'Failed to upload media'));
+//       }
+
+//       const photos = uploadedMedia.filter((m) => m.type === 'photo').length;
+//       const videos = uploadedMedia.filter((m) => m.type === 'video').length;
+//       if (photos > 3)
+//         return next(createHttpError(400, 'Post can have maximum 3 photos'));
+//       if (videos > 1)
+//         return next(createHttpError(400, 'Post can have only 1 video'));
+
+//       newPost.media = uploadedMedia;
+//       await newPost.save();
+//     }
+
+//     res
+//       .status(201)
+//       .json({ status: 201, message: 'Post created', data: newPost });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
+// export const createPostController = async (req, res, next) => {
+//   try {
+//     const { _id: userId } = req.user;
+//     if (!userId) return next(createHttpError(401, 'Unauthorized'));
+
+//     const {
+//       title,
+//       description,
+//       country,
+//       city,
+//       date,
+//       type,
+//       price,
+//       roleNeeded,
+//       roleSlots: incomingRoleSlots,
+//       maxAssigned,
+//     } = req.body;
+
+//     if (!title || !description || !country || !city) {
+//       return next(createHttpError(400, 'Missing required fields'));
+//     }
+
+//     const roleSlots = normalizeRoleSlots({
+//       roleSlots: incomingRoleSlots,
+//       roleNeeded,
+//     });
+
+//     const createData = {
+//       author: userId,
+//       title: String(title).trim(),
+//       description: String(description),
+//       country: String(country),
+//       city: String(city),
+//       type: type || 'tfp',
+//       price: Number(price) || 0,
+//       roleSlots,
+//       maxAssigned: typeof maxAssigned === 'number' ? maxAssigned : 5,
+//     };
+
+//     if (date) {
+//       const parsed = new Date(date);
+//       if (Number.isNaN(parsed.getTime())) {
+//         return next(createHttpError(400, 'Invalid date format'));
+//       }
+//       createData.date = parsed;
+//     }
+
+//     const post = await PostCollection.create(createData);
+
+//     res.status(201).json({
+//       status: 201,
+//       message: 'Post created successfully',
+//       data: post,
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
 
 export const getAllPostsController = async (req, res, next) => {
   try {
@@ -261,27 +510,27 @@ export const getPostByIdController = async (req, res, next) => {
   }
 };
 // ✏️ Обновить пост
-export const updatePostController = async (req, res) => {
-  const { id } = req.params;
-  const userId = req.user._id;
+// export const updatePostController = async (req, res) => {
+//   const { id } = req.params;
+//   const userId = req.user._id;
 
-  const post = await PostCollection.findById(id);
-  if (!post) throw createHttpError(404, 'Post not found');
+//   const post = await PostCollection.findById(id);
+//   if (!post) throw createHttpError(404, 'Post not found');
 
-  if (post.author.toString() !== userId.toString()) {
-    throw createHttpError(403, 'You can edit only your own posts');
-  }
+//   if (post.author.toString() !== userId.toString()) {
+//     throw createHttpError(403, 'You can edit only your own posts');
+//   }
 
-  const updatedPost = await PostCollection.findByIdAndUpdate(id, req.body, {
-    new: true,
-  });
+//   const updatedPost = await PostCollection.findByIdAndUpdate(id, req.body, {
+//     new: true,
+//   });
 
-  res.json({
-    status: 200,
-    message: 'Post updated successfully',
-    data: updatedPost,
-  });
-};
+//   res.json({
+//     status: 200,
+//     message: 'Post updated successfully',
+//     data: updatedPost,
+//   });
+// };
 
 // 🗑️ Удалить пост
 export const deletePostController = async (req, res) => {
