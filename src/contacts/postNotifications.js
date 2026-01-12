@@ -7,6 +7,74 @@ import { createNotification } from '../utils/notifications.js';
 import Application from '../db/models/Application.js';
 /// ✅ Подать заявку на пост
 
+// export const applyToPostController = async (req, res, next) => {
+//   try {
+//     const { id } = req.params;
+//     const io = req.app?.get('io');
+//     const userId = req.user._id;
+//     const { appliedRole, message } = req.body;
+
+//     const post = await PostCollection.findById(id);
+//     if (!post) return next(createHttpError(404, 'Post not found'));
+//     if (post.status !== 'open')
+//       return next(
+//         createHttpError(400, 'Applications are closed for this post'),
+//       );
+
+//     const slot = (post.roleSlots || []).find((s) => s.role === appliedRole);
+//     if (!slot) {
+//       return next(
+//         createHttpError(
+//           400,
+//           `This post is not looking for role "${appliedRole}"`,
+//         ),
+//       );
+//     }
+
+//     const existing = await Application.findOne({ post: id, user: userId });
+//     if (existing) {
+//       return next(createHttpError(400, 'You already applied to this post'));
+//     }
+
+//     const application = await Application.create({
+//       post: id,
+//       user: userId,
+//       appliedRole,
+//       message: message || '',
+//     });
+
+//     await PostCollection.findByIdAndUpdate(id, {
+//       $inc: { applicationsCount: 1 },
+//     });
+
+//     const notification = await createNotification({
+//       user: post.author,
+//       fromUser: userId,
+//       type: 'post',
+//       key: 'new_application',
+//       title: 'New application for your post',
+//       message: `${req.user.name} applied as ${appliedRole} for "${post.title}"`,
+//       relatedPost: post._id,
+//       meta: {
+//         applicantId: userId,
+//         appliedRole,
+//         postId: post._id,
+//       },
+//       unique: true,
+//       uniqueMetaKeys: ['applicantId', 'postId'],
+//     });
+//     if (io) {
+//       io.sendToUser(post.author, 'notification:new', notification);
+//     }
+//     res.status(201).json({
+//       status: 201,
+//       message: 'Application submitted successfully',
+//       data: application,
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
 export const applyToPostController = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -21,6 +89,10 @@ export const applyToPostController = async (req, res, next) => {
         createHttpError(400, 'Applications are closed for this post'),
       );
 
+    if (String(post.author) === String(userId)) {
+      return next(createHttpError(403, 'You cannot apply to your own post'));
+    }
+
     const slot = (post.roleSlots || []).find((s) => s.role === appliedRole);
     if (!slot) {
       return next(
@@ -29,6 +101,22 @@ export const applyToPostController = async (req, res, next) => {
           `This post is not looking for role "${appliedRole}"`,
         ),
       );
+    }
+
+    let userRoles = [];
+    if (Array.isArray(req.user?.roles)) userRoles = req.user.roles;
+    else if (req.user?.role) userRoles = [req.user.role];
+    else {
+      const u = await UserCollection.findById(userId)
+        .select('role roles')
+        .lean();
+      if (u)
+        userRoles = Array.isArray(u.roles) ? u.roles : u.role ? [u.role] : [];
+    }
+    userRoles = (userRoles || []).map(String);
+
+    if (!userRoles.includes(String(appliedRole))) {
+      return next(createHttpError(403, 'You can apply only to your own role'));
     }
 
     const existing = await Application.findOne({ post: id, user: userId });
@@ -53,7 +141,9 @@ export const applyToPostController = async (req, res, next) => {
       type: 'post',
       key: 'new_application',
       title: 'New application for your post',
-      message: `${req.user.name} applied as ${appliedRole} for "${post.title}"`,
+      message: `${req.user.name || 'User'} applied as ${appliedRole} for "${
+        post.title
+      }"`,
       relatedPost: post._id,
       meta: {
         applicantId: userId,
@@ -63,9 +153,15 @@ export const applyToPostController = async (req, res, next) => {
       unique: true,
       uniqueMetaKeys: ['applicantId', 'postId'],
     });
+
     if (io) {
-      io.sendToUser(post.author, 'notification:new', notification);
+      try {
+        io.sendToUser(post.author, 'notification:new', notification);
+      } catch (e) {
+        console.warn('[applyToPost] socket send warning', e);
+      }
     }
+
     res.status(201).json({
       status: 201,
       message: 'Application submitted successfully',
