@@ -49,5 +49,6 @@ const postSchema = new Schema(
   },
   { timestamps: true, versionKey: false },
 );
-
+postSchema.index({ author: 1, status: 1 });
+postSchema.index({ status: 1, date: 1 });
 export default model('post', postSchema);

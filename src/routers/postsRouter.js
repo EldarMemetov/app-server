@@ -129,7 +129,7 @@ postsRouter.patch(
   '/:id/interested',
   authenticate,
   checkBlocked,
-  ctrlWrapper(postsController.toggleInterestedController),
+  ctrlWrapper(postNotifications.toggleInterestedController),
 );
 
 postsRouter.patch(

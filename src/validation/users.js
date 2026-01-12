@@ -53,4 +53,7 @@ export const userUpdateProfileSchema = Joi.object({
       description: Joi.string().max(200),
     }),
   ),
+  availability: Joi.string().valid('local', 'country', 'international'),
+  languages: Joi.array().items(Joi.string().min(2).max(50)),
+  website: Joi.string().uri().allow(''),
 });

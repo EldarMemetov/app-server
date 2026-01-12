@@ -4,198 +4,320 @@ import UserCollection from '../db/models/User.js';
 import createHttpError from 'http-errors';
 import PostCollection from '../db/models/Post.js';
 import { createNotification } from '../utils/notifications.js';
+import Application from '../db/models/Application.js';
 /// ✅ Подать заявку на пост
-export const applyToPostController = async (req, res) => {
-  const { id } = req.params; // postId
-  const userId = req.user._id;
-  const { message } = req.body;
 
-  const post = await PostCollection.findById(id);
-  if (!post) throw createHttpError(404, 'Post not found');
-  if (post.status !== 'open')
-    throw createHttpError(400, 'Applications are closed for this post');
+export const applyToPostController = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const io = req.app?.get('io');
+    const userId = req.user._id;
+    const { appliedRole, message } = req.body;
 
-  const alreadyApplied = post.candidates.some(
-    (c) => c.user.toString() === userId.toString(),
-  );
-  if (alreadyApplied)
-    throw createHttpError(400, 'You already applied to this post');
+    const post = await PostCollection.findById(id);
+    if (!post) return next(createHttpError(404, 'Post not found'));
+    if (post.status !== 'open')
+      return next(
+        createHttpError(400, 'Applications are closed for this post'),
+      );
 
-  post.candidates.push({ user: userId, message });
-  await post.save();
+    const slot = (post.roleSlots || []).find((s) => s.role === appliedRole);
+    if (!slot) {
+      return next(
+        createHttpError(
+          400,
+          `This post is not looking for role "${appliedRole}"`,
+        ),
+      );
+    }
 
-  // Создание уведомления с проверкой уникальности по applicantId
-  await createNotification({
-    user: post.author,
-    type: 'post',
-    key: 'new_application',
-    title: 'New application for your post',
-    message: `${req.user.name} applied for your post "${post.title}"`,
-    relatedPost: post._id,
-    meta: {
-      applicantId: userId,
-      applicantName: req.user.name,
-      applicantSurname: req.user.surname,
-      applicantEmail: req.user.email,
-      postTitle: post.title,
-      postCity: post.city,
-    },
-    unique: true,
-    uniqueMetaKeys: ['applicantId'],
-  });
+    const existing = await Application.findOne({ post: id, user: userId });
+    if (existing) {
+      return next(createHttpError(400, 'You already applied to this post'));
+    }
 
-  res.status(201).json({
-    status: 201,
-    message: 'Application submitted successfully',
-    data: post.candidates,
-  });
+    const application = await Application.create({
+      post: id,
+      user: userId,
+      appliedRole,
+      message: message || '',
+    });
+
+    await PostCollection.findByIdAndUpdate(id, {
+      $inc: { applicationsCount: 1 },
+    });
+
+    const notification = await createNotification({
+      user: post.author,
+      fromUser: userId,
+      type: 'post',
+      key: 'new_application',
+      title: 'New application for your post',
+      message: `${req.user.name} applied as ${appliedRole} for "${post.title}"`,
+      relatedPost: post._id,
+      meta: {
+        applicantId: userId,
+        appliedRole,
+        postId: post._id,
+      },
+      unique: true,
+      uniqueMetaKeys: ['applicantId', 'postId'],
+    });
+    if (io) {
+      io.sendToUser(post.author, 'notification:new', notification);
+    }
+    res.status(201).json({
+      status: 201,
+      message: 'Application submitted successfully',
+      data: application,
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
 // ✅ Назначить кандидата
-export const assignCandidateController = async (req, res) => {
-  const { id } = req.params;
-  const { userIds } = req.body;
-  const currentUserId = req.user._id;
+export const assignCandidateController = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const io = req.app?.get('io');
+    const { assignments } = req.body;
+    const currentUserId = req.user._id;
 
-  const post = await PostCollection.findById(id);
-  if (!post) throw createHttpError(404, 'Post not found');
+    if (!Array.isArray(assignments) || assignments.length === 0) {
+      return next(createHttpError(400, 'Assignments are required'));
+    }
 
-  if (post.author.toString() !== currentUserId.toString()) {
-    throw createHttpError(403, 'Only the post author can assign candidates');
-  }
+    const post = await PostCollection.findById(id);
+    if (!post) return next(createHttpError(404, 'Post not found'));
+    if (post.author.toString() !== currentUserId.toString()) {
+      return next(
+        createHttpError(403, 'Only the post author can assign candidates'),
+      );
+    }
+    if (post.status !== 'open') {
+      return next(createHttpError(400, 'Post is not open for assignment'));
+    }
 
-  const invalidUsers = userIds.filter(
-    (uid) => !post.candidates.some((c) => c.user.toString() === uid),
-  );
-  if (invalidUsers.length > 0) {
-    throw createHttpError(
-      404,
-      `These users are not candidates for this post: ${invalidUsers.join(
-        ', ',
-      )}`,
+    if (!post.date) {
+      return next(
+        createHttpError(
+          400,
+          'Post date is required before assigning candidates',
+        ),
+      );
+    }
+
+    const slotMap = {};
+    (post.roleSlots || []).forEach((s) => {
+      slotMap[s.role] = {
+        required: Number(s.required) || 0,
+        assigned: Array.isArray(s.assigned) ? s.assigned.map(String) : [],
+      };
+    });
+
+    const userIds = assignments.map((a) => String(a.userId));
+    const apps = await Application.find({ post: id, user: { $in: userIds } });
+
+    const invalid = [];
+    for (const a of assignments) {
+      const app = apps.find((x) => x.user.toString() === String(a.userId));
+      if (!app || app.appliedRole !== a.role) {
+        invalid.push(`${a.userId} (role ${a.role})`);
+      }
+    }
+    if (invalid.length > 0) {
+      return next(
+        createHttpError(
+          400,
+          `These users did not apply for given roles: ${invalid.join(', ')}`,
+        ),
+      );
+    }
+
+    const counts = {};
+    for (const [role, val] of Object.entries(slotMap)) {
+      counts[role] = val.assigned.length;
+    }
+
+    for (const a of assignments) {
+      if (!slotMap[a.role]) {
+        return next(
+          createHttpError(400, `Role ${a.role} is not defined for this post`),
+        );
+      }
+      counts[a.role] = (counts[a.role] || 0) + 1;
+      if (counts[a.role] > slotMap[a.role].required) {
+        return next(
+          createHttpError(
+            400,
+            `Too many assignees for role ${a.role}. Max ${
+              slotMap[a.role].required
+            }`,
+          ),
+        );
+      }
+    }
+
+    const assignedIds = assignments.map((a) => a.userId);
+
+    await Application.updateMany(
+      { post: id, user: { $in: assignedIds } },
+      { $set: { status: 'selected' } },
     );
-  }
+    await Application.updateMany(
+      { post: id, user: { $nin: assignedIds }, status: 'applied' },
+      { $set: { status: 'rejected' } },
+    );
 
-  post.assignedTo = userIds;
-  post.status = 'in_progress';
-  await post.save();
+    for (const a of assignments) {
+      const slot = post.roleSlots.find((s) => s.role === a.role);
+      if (slot) {
+        slot.assigned = Array.from(
+          new Set([...(slot.assigned || []).map(String), String(a.userId)]),
+        );
+      }
+      post.assignedTo = Array.from(
+        new Set([...(post.assignedTo || []).map(String), String(a.userId)]),
+      );
+    }
 
-  for (const uid of userIds) {
-    await CalendarEvent.create({
-      title: `Photoshoot: ${post.title}`,
-      description: post.description,
-      date: post.date,
-      post: post._id,
-      participants: [uid, post.author],
-      createdBy: post.author,
-    });
+    post.status = 'in_progress';
+    await post.save();
 
-    await createNotification({
-      user: uid,
-      type: 'post',
-      key: 'post_assigned',
-      title: `You were assigned to post "${post.title}"`,
-      message: `You have been assigned to post "${post.title}" in ${post.city}`,
-      relatedPost: post._id,
-      meta: {
-        postId: post._id,
-        postTitle: post.title,
-        postCity: post.city,
-        authorId: post.author,
-        authorName: req.user.name,
-      },
-      unique: true,
-      uniqueMetaKeys: ['postId'],
-    });
-
-    // Напоминание за день до съемки
-    const reminderDate = new Date(post.date);
-    reminderDate.setDate(reminderDate.getDate() - 1);
-
-    await createNotification({
-      user: uid,
-      type: 'reminder',
-      key: 'shooting_reminder',
-      title: `Reminder: Photoshoot for "${post.title}"`,
-      message: `Reminder: You have a photoshoot for "${
-        post.title
-      }" on ${post.date.toDateString()}`,
-      relatedPost: post._id,
-      meta: {
-        postId: post._id,
-        postTitle: post.title,
-        postCity: post.city,
+    const uniqueParticipants = Array.from(
+      new Set([post.author.toString(), ...assignedIds.map(String)]),
+    );
+    await CalendarEvent.findOneAndUpdate(
+      { post: post._id },
+      {
+        title: `Photoshoot: ${post.title}`,
+        description: post.description,
         date: post.date,
+        participants: uniqueParticipants,
+        createdBy: post.author,
       },
-      scheduledAt: reminderDate,
-      unique: true,
-      uniqueMetaKeys: ['postId'],
-    });
-  }
-
-  res.json({
-    status: 200,
-    message: 'Candidates assigned and events created in calendar',
-    data: post,
-  });
-};
-
-export const completePostController = async (req, res) => {
-  const { id } = req.params;
-  const currentUserId = req.user._id;
-
-  const post = await PostCollection.findById(id);
-  if (!post) throw createHttpError(404, 'Post not found');
-
-  if (post.author.toString() !== currentUserId.toString()) {
-    throw createHttpError(403, 'Only the post author can complete it');
-  }
-
-  if (post.status !== 'in_progress') {
-    throw createHttpError(400, 'Post is not in progress');
-  }
-
-  post.status = 'completed';
-  await post.save();
-
-  if (Array.isArray(post.assignedTo) && post.assignedTo.length > 0) {
-    // Обновляем рейтинг исполнителей
-    await UserCollection.updateMany(
-      { _id: { $in: post.assignedTo } },
-      { $inc: { rating: 10 } },
+      { upsert: true, new: true },
     );
 
-    // Обновляем рейтинг автора
-    await UserCollection.findByIdAndUpdate(post.author, {
-      $inc: { rating: 5 },
-    });
+    const reminderDate = new Date(post.date);
+    if (!isNaN(reminderDate.getTime())) {
+      reminderDate.setDate(reminderDate.getDate() - 1);
+    }
 
-    // Уведомления о завершении поста
-    for (const uid of post.assignedTo) {
-      await createNotification({
-        user: uid,
+    for (const a of assignments) {
+      const notification = await createNotification({
+        user: a.userId,
         type: 'post',
-        key: 'post_completed',
-        title: `Post "${post.title}" completed`,
-        message: `The post "${post.title}" in ${post.city} has been completed`,
+        key: 'post_assigned',
+        title: `You were assigned to post "${post.title}"`,
+        message: `You have been assigned as ${a.role} for "${post.title}" in ${post.city}`,
         relatedPost: post._id,
         meta: {
           postId: post._id,
-          postTitle: post.title,
-          postCity: post.city,
-          authorId: post.author,
+          assignedRole: a.role,
+          user: a.userId,
         },
         unique: true,
-        uniqueMetaKeys: ['postId'],
+        uniqueMetaKeys: ['postId', 'assignedRole', 'user'],
       });
+      if (io) {
+        io.sendToUser(a.userId, 'notification:new', notification);
+      }
+      if (!isNaN(reminderDate.getTime())) {
+        await createNotification({
+          user: a.userId,
+          type: 'reminder',
+          key: 'shooting_reminder',
+          title: `Reminder: Photoshoot for "${post.title}"`,
+          message: `Reminder: You have a photoshoot for "${
+            post.title
+          }" on ${post.date.toDateString()}`,
+          relatedPost: post._id,
+          meta: {
+            postId: post._id,
+            postTitle: post.title,
+            postCity: post.city,
+            date: post.date,
+          },
+          scheduledAt: reminderDate,
+          unique: true,
+          uniqueMetaKeys: ['postId', 'user', 'date'],
+        });
+      }
     }
-  }
 
-  res.json({
-    status: 200,
-    message: 'Post completed and ratings updated',
-    data: post,
-  });
+    res.json({
+      status: 200,
+      message: 'Candidates assigned and events created in calendar',
+      data: post,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const completePostController = async (req, res, next) => {
+  try {
+    const io = req.app?.get('io');
+    const { id } = req.params;
+    const currentUserId = req.user._id;
+
+    const post = await PostCollection.findById(id);
+    if (!post) return next(createHttpError(404, 'Post not found'));
+
+    if (post.author.toString() !== currentUserId.toString()) {
+      return next(createHttpError(403, 'Only the post author can complete it'));
+    }
+
+    if (post.status !== 'in_progress') {
+      return next(createHttpError(400, 'Post is not in progress'));
+    }
+
+    post.status = 'completed';
+    await post.save();
+
+    if (Array.isArray(post.assignedTo) && post.assignedTo.length > 0) {
+      await UserCollection.updateMany(
+        { _id: { $in: post.assignedTo } },
+        { $inc: { rating: 10 } },
+      );
+
+      await Application.updateMany(
+        { post: post._id, user: { $in: post.assignedTo } },
+        { $set: { status: 'completed' } },
+      );
+
+      await UserCollection.findByIdAndUpdate(post.author, {
+        $inc: { rating: 5 },
+      });
+
+      for (const uid of post.assignedTo) {
+        const notification = await createNotification({
+          user: uid,
+          type: 'post',
+          key: 'post_completed',
+          title: `Post "${post.title}" completed`,
+          message: `The post "${post.title}" in ${post.city} has been completed`,
+          relatedPost: post._id,
+          meta: { postId: post._id, user: uid },
+          unique: true,
+          uniqueMetaKeys: ['postId', 'user'],
+        });
+        if (io) {
+          io.sendToUser(uid, 'notification:new', notification);
+        }
+      }
+    }
+
+    res.json({
+      status: 200,
+      message: 'Post completed and ratings updated',
+      data: post,
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
 export const getUserNotifications = async (req, res) => {
@@ -237,4 +359,40 @@ export const markNotificationRead = async (req, res) => {
     message: 'Notification marked as read',
     data: notification,
   });
+};
+// 💼 Добавить / убрать заинтересованность
+export const toggleInterestedController = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    const post = await PostCollection.findById(id);
+    if (!post) return next(createHttpError(404, 'Post not found'));
+
+    const isInterested = (post.interestedUsers || []).some(
+      (u) => String(u) === String(userId),
+    );
+
+    if (isInterested) {
+      post.interestedUsers = (post.interestedUsers || []).filter(
+        (u) => String(u) !== String(userId),
+      );
+    } else {
+      post.interestedUsers = Array.from(
+        new Set([...(post.interestedUsers || []).map(String), String(userId)]),
+      );
+    }
+
+    await post.save();
+
+    res.json({
+      status: 200,
+      message: isInterested
+        ? 'Interest removed successfully'
+        : 'User marked as interested',
+      interestedCount: post.interestedUsers.length,
+    });
+  } catch (err) {
+    next(err);
+  }
 };

@@ -55,6 +55,13 @@ const userSchema = new Schema(
         public_id: { type: String },
       },
     ],
+    availability: {
+      type: String,
+      enum: ['local', 'country', 'international'],
+      default: 'local',
+    },
+    languages: { type: [String], default: [] },
+    website: { type: String, default: '' },
 
     needsReview: { type: Boolean, default: false },
   },

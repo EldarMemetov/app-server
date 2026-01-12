@@ -6,6 +6,7 @@ import { toggleLike } from './likesGeneric.js';
 import { toggleFavorite as toggleFavoriteService } from './favorites.js';
 import Comment from '../db/models/Comment.js';
 import { roles } from '../constants/roles.js';
+import { checkPostStatus } from '../services/postStatusService.js';
 
 const normalizeRoleSlots = (body) => {
   let roleSlots = [];
@@ -102,7 +103,7 @@ export const createPostWithMediaController = async (req, res, next) => {
     }
 
     const newPost = await PostCollection.create(postData);
-
+    await checkPostStatus(newPost);
     if (req.files && req.files.length > 0) {
       if (req.files.length > 5) {
         return next(createHttpError(400, 'Too many files (max 5)'));
@@ -205,6 +206,8 @@ export const createPostController = async (req, res, next) => {
 
     const post = await PostCollection.create(createData);
 
+    await checkPostStatus(post);
+
     res.status(201).json({
       status: 201,
       message: 'Post created successfully',
@@ -276,6 +279,8 @@ export const updatePostController = async (req, res, next) => {
       new: true,
     });
 
+    await checkPostStatus(updatedPost);
+
     res.json({
       status: 200,
       message: 'Post updated successfully',
@@ -286,155 +291,14 @@ export const updatePostController = async (req, res, next) => {
   }
 };
 
-// export const createPostWithMediaController = async (req, res, next) => {
-//   try {
-//     const { _id: userId } = req.user;
-//     if (!userId) return next(createHttpError(401, 'Unauthorized'));
-
-//     const {
-//       title,
-//       description,
-//       country,
-//       city,
-//       date,
-//       type,
-//       price,
-//       maxAssigned,
-//     } = req.body;
-//     if (!title || !description || !country || !city)
-//       return next(createHttpError(400, 'Missing required fields'));
-
-//     const roleSlots = normalizeRoleSlots(req.body);
-
-//     const postData = {
-//       author: userId,
-//       title: String(title).trim(),
-//       description: String(description),
-//       country: String(country),
-//       city: String(city),
-//       type: type || 'tfp',
-//       price: Number(price) || 0,
-//       roleSlots,
-//       maxAssigned: typeof maxAssigned === 'number' ? maxAssigned : 5,
-//     };
-
-//     if (date) {
-//       const parsed = new Date(date);
-//       if (isNaN(parsed.getTime()))
-//         return next(createHttpError(400, 'Invalid date format'));
-//       postData.date = parsed;
-//     }
-
-//     const newPost = await PostCollection.create(postData);
-
-//     if (req.files && req.files.length > 0) {
-//       if (req.files.length > 5) {
-//         return next(createHttpError(400, 'Too many files (max 5)'));
-//       }
-
-//       const uploadedMedia = [];
-//       try {
-//         for (const file of req.files) {
-//           if (
-//             !file.mimetype.startsWith('image') &&
-//             !file.mimetype.startsWith('video')
-//           ) {
-//             throw createHttpError(400, 'Invalid file type');
-//           }
-//           const { url, public_id } = await saveFileToCloudinary(file);
-//           const mediaType = file.mimetype.startsWith('video')
-//             ? 'video'
-//             : 'photo';
-//           uploadedMedia.push({ type: mediaType, url, public_id });
-//         }
-//       } catch (uploadErr) {
-//         console.error('Upload error:', uploadErr);
-//         return next(createHttpError(500, 'Failed to upload media'));
-//       }
-
-//       const photos = uploadedMedia.filter((m) => m.type === 'photo').length;
-//       const videos = uploadedMedia.filter((m) => m.type === 'video').length;
-//       if (photos > 3)
-//         return next(createHttpError(400, 'Post can have maximum 3 photos'));
-//       if (videos > 1)
-//         return next(createHttpError(400, 'Post can have only 1 video'));
-
-//       newPost.media = uploadedMedia;
-//       await newPost.save();
-//     }
-
-//     res
-//       .status(201)
-//       .json({ status: 201, message: 'Post created', data: newPost });
-//   } catch (err) {
-//     next(err);
-//   }
-// };
-
-// export const createPostController = async (req, res, next) => {
-//   try {
-//     const { _id: userId } = req.user;
-//     if (!userId) return next(createHttpError(401, 'Unauthorized'));
-
-//     const {
-//       title,
-//       description,
-//       country,
-//       city,
-//       date,
-//       type,
-//       price,
-//       roleNeeded,
-//       roleSlots: incomingRoleSlots,
-//       maxAssigned,
-//     } = req.body;
-
-//     if (!title || !description || !country || !city) {
-//       return next(createHttpError(400, 'Missing required fields'));
-//     }
-
-//     const roleSlots = normalizeRoleSlots({
-//       roleSlots: incomingRoleSlots,
-//       roleNeeded,
-//     });
-
-//     const createData = {
-//       author: userId,
-//       title: String(title).trim(),
-//       description: String(description),
-//       country: String(country),
-//       city: String(city),
-//       type: type || 'tfp',
-//       price: Number(price) || 0,
-//       roleSlots,
-//       maxAssigned: typeof maxAssigned === 'number' ? maxAssigned : 5,
-//     };
-
-//     if (date) {
-//       const parsed = new Date(date);
-//       if (Number.isNaN(parsed.getTime())) {
-//         return next(createHttpError(400, 'Invalid date format'));
-//       }
-//       createData.date = parsed;
-//     }
-
-//     const post = await PostCollection.create(createData);
-
-//     res.status(201).json({
-//       status: 201,
-//       message: 'Post created successfully',
-//       data: post,
-//     });
-//   } catch (err) {
-//     next(err);
-//   }
-// };
-
 export const getAllPostsController = async (req, res, next) => {
   try {
     const { roleNeeded, city, type, sortFavorites } = req.query;
     const filter = {};
-    if (roleNeeded) filter.roleNeeded = { $in: roleNeeded.split(',') };
+    if (roleNeeded) {
+      const rolesArr = roleNeeded.split(',');
+      filter.roleSlots = { $elemMatch: { role: { $in: rolesArr } } };
+    }
     if (city) filter.city = city;
     if (type) filter.type = type;
 
@@ -461,14 +325,10 @@ export const getAllPostsController = async (req, res, next) => {
       }
     }
 
-    if (!posts || posts.length === 0) {
-      throw createHttpError(404, 'No posts found');
-    }
-
     res.json({
       status: 200,
       message: 'Posts fetched successfully',
-      data: posts,
+      data: posts || [],
     });
   } catch (err) {
     next(err);
@@ -509,28 +369,6 @@ export const getPostByIdController = async (req, res, next) => {
     next(err);
   }
 };
-// ✏️ Обновить пост
-// export const updatePostController = async (req, res) => {
-//   const { id } = req.params;
-//   const userId = req.user._id;
-
-//   const post = await PostCollection.findById(id);
-//   if (!post) throw createHttpError(404, 'Post not found');
-
-//   if (post.author.toString() !== userId.toString()) {
-//     throw createHttpError(403, 'You can edit only your own posts');
-//   }
-
-//   const updatedPost = await PostCollection.findByIdAndUpdate(id, req.body, {
-//     new: true,
-//   });
-
-//   res.json({
-//     status: 200,
-//     message: 'Post updated successfully',
-//     data: updatedPost,
-//   });
-// };
 
 // 🗑️ Удалить пост
 export const deletePostController = async (req, res) => {
@@ -624,32 +462,6 @@ export const getMyPostsController = async (req, res, next) => {
     next(err);
   }
 };
-// 💼 Добавить / убрать заинтересованность
-export const toggleInterestedController = async (req, res) => {
-  const { id } = req.params;
-  const userId = req.user._id;
-
-  const post = await PostCollection.findById(id);
-  if (!post) throw createHttpError(404, 'Post not found');
-
-  const isInterested = post.interestedUsers.includes(userId);
-
-  if (isInterested) {
-    post.interestedUsers.pull(userId);
-  } else {
-    post.interestedUsers.push(userId);
-  }
-
-  await post.save();
-
-  res.json({
-    status: 200,
-    message: isInterested
-      ? 'Interest removed successfully'
-      : 'User marked as interested',
-    interestedCount: post.interestedUsers.length,
-  });
-};
 
 // 🎯 Получить посты по фильтрам
 export const getFilteredPostsController = async (req, res) => {
@@ -658,17 +470,21 @@ export const getFilteredPostsController = async (req, res) => {
 
   if (city) filter.city = city;
   if (type) filter.type = type;
-  if (roleNeeded) filter.roleNeeded = { $in: roleNeeded.split(',') };
+  if (roleNeeded) {
+    const rolesArr = roleNeeded.split(',');
+    filter.roleSlots = { $elemMatch: { role: { $in: rolesArr } } };
+  }
 
   const posts = await PostCollection.find(filter)
     .populate('author', 'name surname city photo role')
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .lean();
 
   res.json({
     status: 200,
     message: 'Filtered posts fetched successfully',
     count: posts.length,
-    data: posts,
+    data: posts || [],
   });
 };
 

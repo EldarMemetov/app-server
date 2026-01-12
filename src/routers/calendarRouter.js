@@ -3,7 +3,10 @@ import authenticate from '../middlewares/authenticate.js';
 import checkBlocked from '../middlewares/checkBlocked.js';
 import validateBody from '../utils/validateBody.js';
 import ctrlWrapper from '../utils/ctrlWrapper.js';
-import { createEventSchema } from '../validation/calendar.js';
+import {
+  createEventSchema,
+  updateEventSchema,
+} from '../validation/calendar.js';
 import {
   createEventController,
   getUserEventsController,
@@ -35,6 +38,7 @@ calendarRouter.patch(
   '/:id',
   authenticate,
   checkBlocked,
+  validateBody(updateEventSchema),
   ctrlWrapper(updateEventController),
 );
 

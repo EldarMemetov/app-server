@@ -36,5 +36,8 @@ export const addCommentSchema = Joi.object({
 });
 
 export const applySchema = Joi.object({
-  message: Joi.string().max(500).optional(),
+  appliedRole: Joi.string()
+    .valid(...roles)
+    .required(),
+  message: Joi.string().max(500).optional().allow(''),
 });

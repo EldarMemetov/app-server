@@ -26,7 +26,7 @@ const notificationSchema = new Schema(
   { timestamps: true, versionKey: false },
 );
 
-notificationSchema.index({ user: 1, key: 1 });
+notificationSchema.index({ user: 1, read: 1, createdAt: -1 });
 
 const Notification = model('notification', notificationSchema);
 export default Notification;
