@@ -365,11 +365,40 @@ export const getAllPostsController = async (req, res, next) => {
 //       post.isFavorited = false;
 //     }
 
+//     const isAuthor =
+//       req.user &&
+//       String(req.user._id) === String(post.author?._id || post.author);
+//     if (isAuthor) {
+//       const applications = await Application.find({ post: id })
+//         .populate('user', 'name surname photo role')
+//         .sort({ createdAt: -1 })
+//         .lean();
+
+//       post.applications = applications.map((a) => ({
+//         id: a._id,
+//         user: a.user
+//           ? {
+//               _id: a.user._id,
+//               name: a.user.name,
+//               surname: a.user.surname,
+//               photo: a.user.photo,
+//               role: a.user.role || null,
+//               profileUrl: `/talents/${String(a.user._id)}`,
+//             }
+//           : null,
+//         appliedRole: a.appliedRole,
+//         message: a.message,
+//         status: a.status,
+//         createdAt: a.createdAt,
+//       }));
+//     }
+
 //     res.json({ status: 200, message: 'Post fetched successfully', data: post });
 //   } catch (err) {
 //     next(err);
 //   }
 // };
+// posts.js (замените getPostByIdController)
 export const getPostByIdController = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -395,8 +424,17 @@ export const getPostByIdController = async (req, res, next) => {
         targetId: id,
       }).lean();
       post.isFavorited = Boolean(exists);
+
+      const myApp = await Application.findOne({
+        post: id,
+        user: userId,
+      }).lean();
+      post.appliedByMe = Boolean(myApp);
+      post.appliedRoleByMe = myApp ? myApp.appliedRole : null;
     } else {
       post.isFavorited = false;
+      post.appliedByMe = false;
+      post.appliedRoleByMe = null;
     }
 
     const isAuthor =
@@ -425,6 +463,8 @@ export const getPostByIdController = async (req, res, next) => {
         status: a.status,
         createdAt: a.createdAt,
       }));
+    } else {
+      post.applications = post.applications || [];
     }
 
     res.json({ status: 200, message: 'Post fetched successfully', data: post });

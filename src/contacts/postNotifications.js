@@ -7,74 +7,6 @@ import { createNotification } from '../utils/notifications.js';
 import Application from '../db/models/Application.js';
 /// ✅ Подать заявку на пост
 
-// export const applyToPostController = async (req, res, next) => {
-//   try {
-//     const { id } = req.params;
-//     const io = req.app?.get('io');
-//     const userId = req.user._id;
-//     const { appliedRole, message } = req.body;
-
-//     const post = await PostCollection.findById(id);
-//     if (!post) return next(createHttpError(404, 'Post not found'));
-//     if (post.status !== 'open')
-//       return next(
-//         createHttpError(400, 'Applications are closed for this post'),
-//       );
-
-//     const slot = (post.roleSlots || []).find((s) => s.role === appliedRole);
-//     if (!slot) {
-//       return next(
-//         createHttpError(
-//           400,
-//           `This post is not looking for role "${appliedRole}"`,
-//         ),
-//       );
-//     }
-
-//     const existing = await Application.findOne({ post: id, user: userId });
-//     if (existing) {
-//       return next(createHttpError(400, 'You already applied to this post'));
-//     }
-
-//     const application = await Application.create({
-//       post: id,
-//       user: userId,
-//       appliedRole,
-//       message: message || '',
-//     });
-
-//     await PostCollection.findByIdAndUpdate(id, {
-//       $inc: { applicationsCount: 1 },
-//     });
-
-//     const notification = await createNotification({
-//       user: post.author,
-//       fromUser: userId,
-//       type: 'post',
-//       key: 'new_application',
-//       title: 'New application for your post',
-//       message: `${req.user.name} applied as ${appliedRole} for "${post.title}"`,
-//       relatedPost: post._id,
-//       meta: {
-//         applicantId: userId,
-//         appliedRole,
-//         postId: post._id,
-//       },
-//       unique: true,
-//       uniqueMetaKeys: ['applicantId', 'postId'],
-//     });
-//     if (io) {
-//       io.sendToUser(post.author, 'notification:new', notification);
-//     }
-//     res.status(201).json({
-//       status: 201,
-//       message: 'Application submitted successfully',
-//       data: application,
-//     });
-//   } catch (err) {
-//     next(err);
-//   }
-// };
 export const applyToPostController = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -173,6 +105,186 @@ export const applyToPostController = async (req, res, next) => {
 };
 
 // ✅ Назначить кандидата
+// export const assignCandidateController = async (req, res, next) => {
+//   try {
+//     const { id } = req.params;
+//     const io = req.app?.get('io');
+//     const { assignments } = req.body;
+//     const currentUserId = req.user._id;
+
+//     if (!Array.isArray(assignments) || assignments.length === 0) {
+//       return next(createHttpError(400, 'Assignments are required'));
+//     }
+
+//     const post = await PostCollection.findById(id);
+//     if (!post) return next(createHttpError(404, 'Post not found'));
+//     if (post.author.toString() !== currentUserId.toString()) {
+//       return next(
+//         createHttpError(403, 'Only the post author can assign candidates'),
+//       );
+//     }
+//     if (post.status !== 'open') {
+//       return next(createHttpError(400, 'Post is not open for assignment'));
+//     }
+
+//     if (!post.date) {
+//       return next(
+//         createHttpError(
+//           400,
+//           'Post date is required before assigning candidates',
+//         ),
+//       );
+//     }
+
+//     const slotMap = {};
+//     (post.roleSlots || []).forEach((s) => {
+//       slotMap[s.role] = {
+//         required: Number(s.required) || 0,
+//         assigned: Array.isArray(s.assigned) ? s.assigned.map(String) : [],
+//       };
+//     });
+
+//     const userIds = assignments.map((a) => String(a.userId));
+//     const apps = await Application.find({ post: id, user: { $in: userIds } });
+
+//     const invalid = [];
+//     for (const a of assignments) {
+//       const app = apps.find((x) => x.user.toString() === String(a.userId));
+//       if (!app || app.appliedRole !== a.role) {
+//         invalid.push(`${a.userId} (role ${a.role})`);
+//       }
+//     }
+//     if (invalid.length > 0) {
+//       return next(
+//         createHttpError(
+//           400,
+//           `These users did not apply for given roles: ${invalid.join(', ')}`,
+//         ),
+//       );
+//     }
+
+//     const counts = {};
+//     for (const [role, val] of Object.entries(slotMap)) {
+//       counts[role] = val.assigned.length;
+//     }
+
+//     for (const a of assignments) {
+//       if (!slotMap[a.role]) {
+//         return next(
+//           createHttpError(400, `Role ${a.role} is not defined for this post`),
+//         );
+//       }
+//       counts[a.role] = (counts[a.role] || 0) + 1;
+//       if (counts[a.role] > slotMap[a.role].required) {
+//         return next(
+//           createHttpError(
+//             400,
+//             `Too many assignees for role ${a.role}. Max ${
+//               slotMap[a.role].required
+//             }`,
+//           ),
+//         );
+//       }
+//     }
+
+//     const assignedIds = assignments.map((a) => a.userId);
+
+//     await Application.updateMany(
+//       { post: id, user: { $in: assignedIds } },
+//       { $set: { status: 'selected' } },
+//     );
+//     await Application.updateMany(
+//       { post: id, user: { $nin: assignedIds }, status: 'applied' },
+//       { $set: { status: 'rejected' } },
+//     );
+
+//     for (const a of assignments) {
+//       const slot = post.roleSlots.find((s) => s.role === a.role);
+//       if (slot) {
+//         slot.assigned = Array.from(
+//           new Set([...(slot.assigned || []).map(String), String(a.userId)]),
+//         );
+//       }
+//       post.assignedTo = Array.from(
+//         new Set([...(post.assignedTo || []).map(String), String(a.userId)]),
+//       );
+//     }
+
+//     post.status = 'in_progress';
+//     await post.save();
+
+//     const uniqueParticipants = Array.from(
+//       new Set([post.author.toString(), ...assignedIds.map(String)]),
+//     );
+//     await CalendarEvent.findOneAndUpdate(
+//       { post: post._id },
+//       {
+//         title: `Photoshoot: ${post.title}`,
+//         description: post.description,
+//         date: post.date,
+//         participants: uniqueParticipants,
+//         createdBy: post.author,
+//       },
+//       { upsert: true, new: true },
+//     );
+
+//     const reminderDate = new Date(post.date);
+//     if (!isNaN(reminderDate.getTime())) {
+//       reminderDate.setDate(reminderDate.getDate() - 1);
+//     }
+
+//     for (const a of assignments) {
+//       const notification = await createNotification({
+//         user: a.userId,
+//         type: 'post',
+//         key: 'post_assigned',
+//         title: `You were assigned to post "${post.title}"`,
+//         message: `You have been assigned as ${a.role} for "${post.title}" in ${post.city}`,
+//         relatedPost: post._id,
+//         meta: {
+//           postId: post._id,
+//           assignedRole: a.role,
+//           user: a.userId,
+//         },
+//         unique: true,
+//         uniqueMetaKeys: ['postId', 'assignedRole', 'user'],
+//       });
+//       if (io) {
+//         io.sendToUser(a.userId, 'notification:new', notification);
+//       }
+//       if (!isNaN(reminderDate.getTime())) {
+//         await createNotification({
+//           user: a.userId,
+//           type: 'reminder',
+//           key: 'shooting_reminder',
+//           title: `Reminder: Photoshoot for "${post.title}"`,
+//           message: `Reminder: You have a photoshoot for "${
+//             post.title
+//           }" on ${post.date.toDateString()}`,
+//           relatedPost: post._id,
+//           meta: {
+//             postId: post._id,
+//             postTitle: post.title,
+//             postCity: post.city,
+//             date: post.date,
+//           },
+//           scheduledAt: reminderDate,
+//           unique: true,
+//           uniqueMetaKeys: ['postId', 'user', 'date'],
+//         });
+//       }
+//     }
+
+//     res.json({
+//       status: 200,
+//       message: 'Candidates assigned and events created in calendar',
+//       data: post,
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
 export const assignCandidateController = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -217,7 +329,7 @@ export const assignCandidateController = async (req, res, next) => {
 
     const invalid = [];
     for (const a of assignments) {
-      const app = apps.find((x) => x.user.toString() === String(a.userId));
+      const app = apps.find((x) => String(x.user) === String(a.userId));
       if (!app || app.appliedRole !== a.role) {
         invalid.push(`${a.userId} (role ${a.role})`);
       }
@@ -236,34 +348,33 @@ export const assignCandidateController = async (req, res, next) => {
       counts[role] = val.assigned.length;
     }
 
+    const assignmentsByRole = {};
     for (const a of assignments) {
-      if (!slotMap[a.role]) {
+      assignmentsByRole[a.role] = assignmentsByRole[a.role] || [];
+      assignmentsByRole[a.role].push(String(a.userId));
+    }
+
+    for (const [role, arr] of Object.entries(assignmentsByRole)) {
+      counts[role] = (counts[role] || 0) + arr.length;
+      if (!slotMap[role]) {
         return next(
-          createHttpError(400, `Role ${a.role} is not defined for this post`),
+          createHttpError(400, `Role ${role} is not defined for this post`),
         );
       }
-      counts[a.role] = (counts[a.role] || 0) + 1;
-      if (counts[a.role] > slotMap[a.role].required) {
+      if (counts[role] > slotMap[role].required) {
         return next(
           createHttpError(
             400,
-            `Too many assignees for role ${a.role}. Max ${
-              slotMap[a.role].required
-            }`,
+            `Too many assignees for role ${role}. Max ${slotMap[role].required}`,
           ),
         );
       }
     }
 
     const assignedIds = assignments.map((a) => a.userId);
-
     await Application.updateMany(
       { post: id, user: { $in: assignedIds } },
       { $set: { status: 'selected' } },
-    );
-    await Application.updateMany(
-      { post: id, user: { $nin: assignedIds }, status: 'applied' },
-      { $set: { status: 'rejected' } },
     );
 
     for (const a of assignments) {
@@ -278,23 +389,56 @@ export const assignCandidateController = async (req, res, next) => {
       );
     }
 
-    post.status = 'in_progress';
+    for (const [role, slot] of Object.entries(slotMap)) {
+      const updatedSlot = post.roleSlots.find((s) => s.role === role);
+      const assignedCount =
+        updatedSlot && updatedSlot.assigned ? updatedSlot.assigned.length : 0;
+      const required = slot.required || 0;
+      if (assignedCount >= required && required > 0) {
+        const assignedForThisRole = assignmentsByRole[role] || [];
+
+        await Application.updateMany(
+          {
+            post: id,
+            appliedRole: role,
+            status: 'applied',
+            user: { $nin: assignedForThisRole },
+          },
+          { $set: { status: 'rejected' } },
+        );
+      }
+    }
+
+    const allFilled = (post.roleSlots || []).every(
+      (s) =>
+        (Array.isArray(s.assigned) ? s.assigned.length : 0) >=
+        (Number(s.required) || 0),
+    );
+
+    if (allFilled) {
+      post.status = 'in_progress';
+    } else {
+      post.status = 'open';
+    }
+
     await post.save();
 
     const uniqueParticipants = Array.from(
-      new Set([post.author.toString(), ...assignedIds.map(String)]),
+      new Set([post.author.toString(), ...(post.assignedTo || []).map(String)]),
     );
-    await CalendarEvent.findOneAndUpdate(
-      { post: post._id },
-      {
-        title: `Photoshoot: ${post.title}`,
-        description: post.description,
-        date: post.date,
-        participants: uniqueParticipants,
-        createdBy: post.author,
-      },
-      { upsert: true, new: true },
-    );
+    if (uniqueParticipants.length > 0) {
+      await CalendarEvent.findOneAndUpdate(
+        { post: post._id },
+        {
+          title: `Photoshoot: ${post.title}`,
+          description: post.description,
+          date: post.date,
+          participants: uniqueParticipants,
+          createdBy: post.author,
+        },
+        { upsert: true, new: true },
+      );
+    }
 
     const reminderDate = new Date(post.date);
     if (!isNaN(reminderDate.getTime())) {
@@ -309,17 +453,18 @@ export const assignCandidateController = async (req, res, next) => {
         title: `You were assigned to post "${post.title}"`,
         message: `You have been assigned as ${a.role} for "${post.title}" in ${post.city}`,
         relatedPost: post._id,
-        meta: {
-          postId: post._id,
-          assignedRole: a.role,
-          user: a.userId,
-        },
+        meta: { postId: post._id, assignedRole: a.role, user: a.userId },
         unique: true,
         uniqueMetaKeys: ['postId', 'assignedRole', 'user'],
       });
       if (io) {
-        io.sendToUser(a.userId, 'notification:new', notification);
+        try {
+          io.sendToUser(a.userId, 'notification:new', notification);
+        } catch (e) {
+          console.warn('[assignCandidate] socket send warning', e);
+        }
       }
+
       if (!isNaN(reminderDate.getTime())) {
         await createNotification({
           user: a.userId,
@@ -343,10 +488,37 @@ export const assignCandidateController = async (req, res, next) => {
       }
     }
 
+    const updatedPost = await PostCollection.findById(post._id)
+      .populate('author', 'name surname city photo role')
+      .lean();
+
+    const applications = await Application.find({ post: post._id })
+      .populate('user', 'name surname photo role')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    updatedPost.applications = applications.map((a) => ({
+      id: a._id,
+      user: a.user
+        ? {
+            _id: a.user._id,
+            name: a.user.name,
+            surname: a.user.surname,
+            photo: a.user.photo,
+            role: a.user.role || null,
+            profileUrl: `/talents/${String(a.user._id)}`,
+          }
+        : null,
+      appliedRole: a.appliedRole,
+      message: a.message,
+      status: a.status,
+      createdAt: a.createdAt,
+    }));
+
     res.json({
       status: 200,
       message: 'Candidates assigned and events created in calendar',
-      data: post,
+      data: updatedPost,
     });
   } catch (err) {
     next(err);
