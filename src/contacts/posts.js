@@ -336,69 +336,6 @@ export const getAllPostsController = async (req, res, next) => {
   }
 };
 
-// export const getPostByIdController = async (req, res, next) => {
-//   try {
-//     const { id } = req.params;
-
-//     const post = await PostCollection.findById(id)
-//       .populate('author', 'name surname city photo role')
-//       .lean();
-
-//     if (!post) return next(createHttpError(404, 'Post not found'));
-
-//     const comments = await Comment.find({ postId: id, deleted: false })
-//       .populate('author', 'name surname photo role')
-//       .sort({ createdAt: -1 })
-//       .lean();
-
-//     post.comments = comments;
-
-//     const userId = req.user?._id;
-//     if (userId) {
-//       const exists = await Favorite.findOne({
-//         userId,
-//         targetType: 'post',
-//         targetId: id,
-//       }).lean();
-//       post.isFavorited = Boolean(exists);
-//     } else {
-//       post.isFavorited = false;
-//     }
-
-//     const isAuthor =
-//       req.user &&
-//       String(req.user._id) === String(post.author?._id || post.author);
-//     if (isAuthor) {
-//       const applications = await Application.find({ post: id })
-//         .populate('user', 'name surname photo role')
-//         .sort({ createdAt: -1 })
-//         .lean();
-
-//       post.applications = applications.map((a) => ({
-//         id: a._id,
-//         user: a.user
-//           ? {
-//               _id: a.user._id,
-//               name: a.user.name,
-//               surname: a.user.surname,
-//               photo: a.user.photo,
-//               role: a.user.role || null,
-//               profileUrl: `/talents/${String(a.user._id)}`,
-//             }
-//           : null,
-//         appliedRole: a.appliedRole,
-//         message: a.message,
-//         status: a.status,
-//         createdAt: a.createdAt,
-//       }));
-//     }
-
-//     res.json({ status: 200, message: 'Post fetched successfully', data: post });
-//   } catch (err) {
-//     next(err);
-//   }
-// };
-// posts.js (замените getPostByIdController)
 export const getPostByIdController = async (req, res, next) => {
   try {
     const { id } = req.params;
