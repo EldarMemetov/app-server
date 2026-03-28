@@ -23,6 +23,7 @@ import profilePublicRouter from './routers/profilePublicRouter.js';
 import corsOptions from './utils/corsOptions.js';
 import { initSocket } from './socket/socket.js';
 import { updateAllPostsStatus } from './services/postStatusService.js';
+import calendarRouter from './routers/calendarRouter.js';
 export const setupServer = () => {
   const app = express();
   const port = Number(env('PORT', 3000));
@@ -50,6 +51,7 @@ export const setupServer = () => {
   app.use('/location', locationRouter);
   app.use('/notifications', notificationsRouter);
   app.use('/favorites', favoritesRouter);
+  app.use('/calendar', calendarRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
@@ -70,16 +72,19 @@ export const setupServer = () => {
   server.listen(port, () => {
     console.log(`🚀 Server running on port ${port}`);
 
-    setInterval(async () => {
-      try {
-        const updatedCount = await updateAllPostsStatus();
-        if (updatedCount > 0) {
-          console.log(`✅ Checked all posts, updated ${updatedCount} posts`);
+    setInterval(
+      async () => {
+        try {
+          const updatedCount = await updateAllPostsStatus();
+          if (updatedCount > 0) {
+            console.log(`✅ Checked all posts, updated ${updatedCount} posts`);
+          }
+        } catch (err) {
+          console.error('❌ Error updating posts status:', err);
         }
-      } catch (err) {
-        console.error('❌ Error updating posts status:', err);
-      }
-    }, 60 * 60 * 1000);
+      },
+      60 * 60 * 1000,
+    );
   });
 
   return app;
