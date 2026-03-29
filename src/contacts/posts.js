@@ -221,79 +221,7 @@ export const createPostController = async (req, res, next) => {
     next(err);
   }
 };
-// export const updatePostController = async (req, res, next) => {
-//   try {
-//     const { id } = req.params;
-//     const userId = req.user._id;
 
-//     const post = await PostCollection.findById(id);
-//     if (!post) return next(createHttpError(404, 'Post not found'));
-
-//     if (post.author.toString() !== userId.toString()) {
-//       return next(createHttpError(403, 'You can edit only your own posts'));
-//     }
-
-//     const {
-//       title,
-//       description,
-//       country,
-//       city,
-//       date,
-//       type,
-//       price,
-//       maxAssigned,
-//       roleSlots: incomingRoleSlots,
-//       roleNeeded,
-//     } = req.body;
-
-//     const roleSlots = normalizeRoleSlots({
-//       roleSlots: incomingRoleSlots,
-//       roleNeeded,
-//     });
-
-//     if (
-//       (incomingRoleSlots !== undefined || roleNeeded !== undefined) &&
-//       (!Array.isArray(roleSlots) || roleSlots.length === 0)
-//     ) {
-//       return next(createHttpError(400, 'At least one role must be specified'));
-//     }
-
-//     const updateData = {};
-
-//     if (title !== undefined) updateData.title = String(title).trim();
-//     if (description !== undefined) updateData.description = description;
-//     if (country !== undefined) updateData.country = country;
-//     if (city !== undefined) updateData.city = city;
-//     if (type !== undefined) updateData.type = type;
-//     if (price !== undefined) updateData.price = Number(price);
-//     if (maxAssigned !== undefined) updateData.maxAssigned = Number(maxAssigned);
-//     if (roleSlots && roleSlots.length > 0) updateData.roleSlots = roleSlots;
-
-//     if (date !== undefined) {
-//       const parsed = new Date(date);
-//       if (isNaN(parsed.getTime()))
-//         return next(createHttpError(400, 'Invalid date format'));
-//       if (isDateInPastBerlin(parsed)) {
-//         return next(createHttpError(400, 'Date cannot be in the past'));
-//       }
-//       updateData.date = parsed;
-//     }
-
-//     const updatedPost = await PostCollection.findByIdAndUpdate(id, updateData, {
-//       new: true,
-//     });
-
-//     await checkPostStatus(updatedPost);
-
-//     res.json({
-//       status: 200,
-//       message: 'Post updated successfully',
-//       data: updatedPost,
-//     });
-//   } catch (err) {
-//     next(err);
-//   }
-// };
 export const updatePostController = async (req, res, next) => {
   try {
     const { id } = req.params;
