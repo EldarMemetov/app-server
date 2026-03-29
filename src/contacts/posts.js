@@ -8,6 +8,7 @@ import Comment from '../db/models/Comment.js';
 import { roles } from '../constants/roles.js';
 import { checkPostStatus } from '../services/postStatusService.js';
 import Application from '../db/models/Application.js';
+import CalendarEvent from '../db/models/CalendarEvent.js';
 
 const normalizeRoleSlots = (body) => {
   let roleSlots = [];
@@ -25,8 +26,8 @@ const normalizeRoleSlots = (body) => {
     const arr = Array.isArray(body.roleNeeded)
       ? body.roleNeeded
       : typeof body.roleNeeded === 'string'
-      ? body.roleNeeded.split(',')
-      : [];
+        ? body.roleNeeded.split(',')
+        : [];
     roleSlots = arr.map((r) => ({ role: r.trim(), required: 1 }));
   }
 
@@ -38,6 +39,7 @@ const normalizeRoleSlots = (body) => {
     .filter((s) => roles.includes(s.role) && s.required > 0);
   return roleSlots;
 };
+
 const isDateInPastBerlin = (input) => {
   if (!input) return false;
   const parsed = new Date(input);
@@ -148,6 +150,7 @@ export const createPostWithMediaController = async (req, res, next) => {
     next(err);
   }
 };
+
 export const createPostController = async (req, res, next) => {
   try {
     const { _id: userId } = req.user;
@@ -218,6 +221,79 @@ export const createPostController = async (req, res, next) => {
     next(err);
   }
 };
+// export const updatePostController = async (req, res, next) => {
+//   try {
+//     const { id } = req.params;
+//     const userId = req.user._id;
+
+//     const post = await PostCollection.findById(id);
+//     if (!post) return next(createHttpError(404, 'Post not found'));
+
+//     if (post.author.toString() !== userId.toString()) {
+//       return next(createHttpError(403, 'You can edit only your own posts'));
+//     }
+
+//     const {
+//       title,
+//       description,
+//       country,
+//       city,
+//       date,
+//       type,
+//       price,
+//       maxAssigned,
+//       roleSlots: incomingRoleSlots,
+//       roleNeeded,
+//     } = req.body;
+
+//     const roleSlots = normalizeRoleSlots({
+//       roleSlots: incomingRoleSlots,
+//       roleNeeded,
+//     });
+
+//     if (
+//       (incomingRoleSlots !== undefined || roleNeeded !== undefined) &&
+//       (!Array.isArray(roleSlots) || roleSlots.length === 0)
+//     ) {
+//       return next(createHttpError(400, 'At least one role must be specified'));
+//     }
+
+//     const updateData = {};
+
+//     if (title !== undefined) updateData.title = String(title).trim();
+//     if (description !== undefined) updateData.description = description;
+//     if (country !== undefined) updateData.country = country;
+//     if (city !== undefined) updateData.city = city;
+//     if (type !== undefined) updateData.type = type;
+//     if (price !== undefined) updateData.price = Number(price);
+//     if (maxAssigned !== undefined) updateData.maxAssigned = Number(maxAssigned);
+//     if (roleSlots && roleSlots.length > 0) updateData.roleSlots = roleSlots;
+
+//     if (date !== undefined) {
+//       const parsed = new Date(date);
+//       if (isNaN(parsed.getTime()))
+//         return next(createHttpError(400, 'Invalid date format'));
+//       if (isDateInPastBerlin(parsed)) {
+//         return next(createHttpError(400, 'Date cannot be in the past'));
+//       }
+//       updateData.date = parsed;
+//     }
+
+//     const updatedPost = await PostCollection.findByIdAndUpdate(id, updateData, {
+//       new: true,
+//     });
+
+//     await checkPostStatus(updatedPost);
+
+//     res.json({
+//       status: 200,
+//       message: 'Post updated successfully',
+//       data: updatedPost,
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
 export const updatePostController = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -268,11 +344,14 @@ export const updatePostController = async (req, res, next) => {
 
     if (date !== undefined) {
       const parsed = new Date(date);
-      if (isNaN(parsed.getTime()))
+      if (isNaN(parsed.getTime())) {
         return next(createHttpError(400, 'Invalid date format'));
+      }
+
       if (isDateInPastBerlin(parsed)) {
         return next(createHttpError(400, 'Date cannot be in the past'));
       }
+
       updateData.date = parsed;
     }
 
@@ -280,7 +359,24 @@ export const updatePostController = async (req, res, next) => {
       new: true,
     });
 
+    if (!updatedPost) {
+      return next(createHttpError(404, 'Post not found'));
+    }
+
     await checkPostStatus(updatedPost);
+
+    const calendarUpdate = {
+      title: `Photoshoot: ${updatedPost.title}`,
+      description: updatedPost.description,
+      date: updatedPost.date,
+    };
+
+    if (updatedPost.date) {
+      await CalendarEvent.updateOne(
+        { post: updatedPost._id },
+        { $set: calendarUpdate },
+      );
+    }
 
     res.json({
       status: 200,
@@ -291,7 +387,6 @@ export const updatePostController = async (req, res, next) => {
     next(err);
   }
 };
-
 export const getAllPostsController = async (req, res, next) => {
   try {
     const { roleNeeded, city, type, sortFavorites } = req.query;
