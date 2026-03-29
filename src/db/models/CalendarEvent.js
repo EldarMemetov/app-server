@@ -19,7 +19,13 @@ const calendarEventSchema = new Schema(
   },
   { timestamps: true },
 );
-calendarEventSchema.index({ post: 1 }, { unique: true });
+calendarEventSchema.index(
+  { post: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { post: { $exists: true, $ne: null } },
+  },
+);
 calendarEventSchema.index({ date: 1, expired: 1 });
 
 const CalendarEvent = model('calendarEvent', calendarEventSchema);
