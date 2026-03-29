@@ -222,6 +222,27 @@ export const createPostController = async (req, res, next) => {
   }
 };
 
+const mergeRoleSlotsPreserveAssigned = (
+  existingSlots = [],
+  incomingSlots = [],
+) => {
+  const existingMap = new Map(
+    existingSlots.map((slot) => [
+      String(slot.role).trim(),
+      Array.isArray(slot.assigned) ? slot.assigned.map(String) : [],
+    ]),
+  );
+
+  return incomingSlots.map((slot) => {
+    const role = String(slot.role).trim();
+    return {
+      role,
+      required: Math.max(1, Number(slot.required) || 1),
+      assigned: existingMap.get(role) || [],
+    };
+  });
+};
+
 export const updatePostController = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -247,16 +268,57 @@ export const updatePostController = async (req, res, next) => {
       roleNeeded,
     } = req.body;
 
-    const roleSlots = normalizeRoleSlots({
-      roleSlots: incomingRoleSlots,
-      roleNeeded,
-    });
+    const hasRoleUpdate =
+      incomingRoleSlots !== undefined || roleNeeded !== undefined;
 
-    if (
-      (incomingRoleSlots !== undefined || roleNeeded !== undefined) &&
-      (!Array.isArray(roleSlots) || roleSlots.length === 0)
-    ) {
-      return next(createHttpError(400, 'At least one role must be specified'));
+    let finalRoleSlots = post.roleSlots || [];
+
+    if (hasRoleUpdate) {
+      const normalizedRoleSlots = normalizeRoleSlots({
+        roleSlots: incomingRoleSlots,
+        roleNeeded,
+      });
+
+      if (
+        !Array.isArray(normalizedRoleSlots) ||
+        normalizedRoleSlots.length === 0
+      ) {
+        return next(
+          createHttpError(400, 'At least one role must be specified'),
+        );
+      }
+
+      const currentRoles = (post.roleSlots || []).map((s) =>
+        String(s.role).trim(),
+      );
+      const incomingRoles = normalizedRoleSlots.map((s) =>
+        String(s.role).trim(),
+      );
+
+      const removedRoles = currentRoles.filter(
+        (role) => !incomingRoles.includes(role),
+      );
+
+      const removedWithAssignments = (post.roleSlots || []).filter(
+        (slot) =>
+          removedRoles.includes(String(slot.role).trim()) &&
+          Array.isArray(slot.assigned) &&
+          slot.assigned.length > 0,
+      );
+
+      if (removedWithAssignments.length > 0) {
+        return next(
+          createHttpError(
+            400,
+            'Cannot remove roles that already have assigned candidates',
+          ),
+        );
+      }
+
+      finalRoleSlots = mergeRoleSlotsPreserveAssigned(
+        post.roleSlots || [],
+        normalizedRoleSlots,
+      );
     }
 
     const updateData = {};
@@ -268,7 +330,7 @@ export const updatePostController = async (req, res, next) => {
     if (type !== undefined) updateData.type = type;
     if (price !== undefined) updateData.price = Number(price);
     if (maxAssigned !== undefined) updateData.maxAssigned = Number(maxAssigned);
-    if (roleSlots && roleSlots.length > 0) updateData.roleSlots = roleSlots;
+    if (hasRoleUpdate) updateData.roleSlots = finalRoleSlots;
 
     if (date !== undefined) {
       const parsed = new Date(date);
