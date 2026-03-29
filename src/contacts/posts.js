@@ -222,14 +222,14 @@ export const createPostController = async (req, res, next) => {
   }
 };
 
-const mergeRoleSlotsPreserveAssigned = (
+const mergeRoleSlotsWithAssignments = (
   existingSlots = [],
   incomingSlots = [],
 ) => {
   const existingMap = new Map(
     existingSlots.map((slot) => [
       String(slot.role).trim(),
-      Array.isArray(slot.assigned) ? slot.assigned.map(String) : [],
+      slot.assigned || [],
     ]),
   );
 
@@ -250,7 +250,6 @@ export const updatePostController = async (req, res, next) => {
 
     const post = await PostCollection.findById(id);
     if (!post) return next(createHttpError(404, 'Post not found'));
-
     if (post.author.toString() !== userId.toString()) {
       return next(createHttpError(403, 'You can edit only your own posts'));
     }
@@ -288,41 +287,31 @@ export const updatePostController = async (req, res, next) => {
         );
       }
 
-      const currentRoles = (post.roleSlots || []).map((s) =>
-        String(s.role).trim(),
-      );
-      const incomingRoles = normalizedRoleSlots.map((s) =>
-        String(s.role).trim(),
-      );
-
-      const removedRoles = currentRoles.filter(
-        (role) => !incomingRoles.includes(role),
-      );
-
-      const removedWithAssignments = (post.roleSlots || []).filter(
+      const rolesToRemove = (post.roleSlots || []).filter(
         (slot) =>
-          removedRoles.includes(String(slot.role).trim()) &&
+          !normalizedRoleSlots.some(
+            (ns) => String(ns.role).trim() === String(slot.role).trim(),
+          ) &&
           Array.isArray(slot.assigned) &&
           slot.assigned.length > 0,
       );
 
-      if (removedWithAssignments.length > 0) {
+      if (rolesToRemove.length > 0) {
         return next(
           createHttpError(
             400,
-            'Cannot remove roles that already have assigned candidates',
+            `Cannot remove roles that already have assigned candidates: ${rolesToRemove.map((r) => r.role).join(', ')}`,
           ),
         );
       }
 
-      finalRoleSlots = mergeRoleSlotsPreserveAssigned(
-        post.roleSlots || [],
+      finalRoleSlots = mergeRoleSlotsWithAssignments(
+        post.roleSlots,
         normalizedRoleSlots,
       );
     }
 
     const updateData = {};
-
     if (title !== undefined) updateData.title = String(title).trim();
     if (description !== undefined) updateData.description = description;
     if (country !== undefined) updateData.country = country;
@@ -334,24 +323,17 @@ export const updatePostController = async (req, res, next) => {
 
     if (date !== undefined) {
       const parsed = new Date(date);
-      if (isNaN(parsed.getTime())) {
+      if (isNaN(parsed.getTime()))
         return next(createHttpError(400, 'Invalid date format'));
-      }
-
-      if (isDateInPastBerlin(parsed)) {
+      if (isDateInPastBerlin(parsed))
         return next(createHttpError(400, 'Date cannot be in the past'));
-      }
-
       updateData.date = parsed;
     }
 
     const updatedPost = await PostCollection.findByIdAndUpdate(id, updateData, {
       new: true,
     });
-
-    if (!updatedPost) {
-      return next(createHttpError(404, 'Post not found'));
-    }
+    if (!updatedPost) return next(createHttpError(404, 'Post not found'));
 
     await checkPostStatus(updatedPost);
 
@@ -360,7 +342,6 @@ export const updatePostController = async (req, res, next) => {
       description: updatedPost.description,
       date: updatedPost.date,
     };
-
     if (updatedPost.date) {
       await CalendarEvent.updateOne(
         { post: updatedPost._id },
