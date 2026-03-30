@@ -227,13 +227,13 @@ const mergeRoleSlotsWithAssignments = (
   incomingSlots = [],
 ) => {
   const existingMap = new Map(
-    existingSlots.map((slot) => [
+    (existingSlots || []).map((slot) => [
       String(slot.role).trim(),
-      slot.assigned || [],
+      Array.isArray(slot.assigned) ? slot.assigned.map(String) : [],
     ]),
   );
 
-  return incomingSlots.map((slot) => {
+  return (incomingSlots || []).map((slot) => {
     const role = String(slot.role).trim();
     return {
       role,
@@ -243,6 +243,18 @@ const mergeRoleSlotsWithAssignments = (
   });
 };
 
+const collectAssignedIds = (slots = []) => {
+  const ids = [];
+  for (const slot of slots || []) {
+    if (Array.isArray(slot.assigned)) {
+      for (const id of slot.assigned) {
+        if (id) ids.push(String(id));
+      }
+    }
+  }
+  return Array.from(new Set(ids));
+};
+
 export const updatePostController = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -250,6 +262,7 @@ export const updatePostController = async (req, res, next) => {
 
     const post = await PostCollection.findById(id);
     if (!post) return next(createHttpError(404, 'Post not found'));
+
     if (post.author.toString() !== userId.toString()) {
       return next(createHttpError(403, 'You can edit only your own posts'));
     }
@@ -271,6 +284,7 @@ export const updatePostController = async (req, res, next) => {
       incomingRoleSlots !== undefined || roleNeeded !== undefined;
 
     let finalRoleSlots = post.roleSlots || [];
+    let finalAssignedUserIds = collectAssignedIds(post.roleSlots || []);
 
     if (hasRoleUpdate) {
       const normalizedRoleSlots = normalizeRoleSlots({
@@ -287,31 +301,16 @@ export const updatePostController = async (req, res, next) => {
         );
       }
 
-      const rolesToRemove = (post.roleSlots || []).filter(
-        (slot) =>
-          !normalizedRoleSlots.some(
-            (ns) => String(ns.role).trim() === String(slot.role).trim(),
-          ) &&
-          Array.isArray(slot.assigned) &&
-          slot.assigned.length > 0,
-      );
-
-      if (rolesToRemove.length > 0) {
-        return next(
-          createHttpError(
-            400,
-            `Cannot remove roles that already have assigned candidates: ${rolesToRemove.map((r) => r.role).join(', ')}`,
-          ),
-        );
-      }
-
       finalRoleSlots = mergeRoleSlotsWithAssignments(
-        post.roleSlots,
+        post.roleSlots || [],
         normalizedRoleSlots,
       );
+
+      finalAssignedUserIds = collectAssignedIds(finalRoleSlots);
     }
 
     const updateData = {};
+
     if (title !== undefined) updateData.title = String(title).trim();
     if (description !== undefined) updateData.description = description;
     if (country !== undefined) updateData.country = country;
@@ -319,34 +318,73 @@ export const updatePostController = async (req, res, next) => {
     if (type !== undefined) updateData.type = type;
     if (price !== undefined) updateData.price = Number(price);
     if (maxAssigned !== undefined) updateData.maxAssigned = Number(maxAssigned);
-    if (hasRoleUpdate) updateData.roleSlots = finalRoleSlots;
+
+    if (hasRoleUpdate) {
+      updateData.roleSlots = finalRoleSlots;
+      updateData.assignedTo = finalAssignedUserIds;
+    }
 
     if (date !== undefined) {
       const parsed = new Date(date);
-      if (isNaN(parsed.getTime()))
+      if (isNaN(parsed.getTime())) {
         return next(createHttpError(400, 'Invalid date format'));
-      if (isDateInPastBerlin(parsed))
+      }
+
+      if (isDateInPastBerlin(parsed)) {
         return next(createHttpError(400, 'Date cannot be in the past'));
+      }
+
       updateData.date = parsed;
     }
 
     const updatedPost = await PostCollection.findByIdAndUpdate(id, updateData, {
       new: true,
     });
-    if (!updatedPost) return next(createHttpError(404, 'Post not found'));
+
+    if (!updatedPost) {
+      return next(createHttpError(404, 'Post not found'));
+    }
+
+    const currentAssignedUserIds = collectAssignedIds(post.roleSlots || []);
+    const removedAssignedUserIds = currentAssignedUserIds.filter(
+      (uid) => !finalAssignedUserIds.includes(uid),
+    );
+
+    if (removedAssignedUserIds.length > 0) {
+      await Application.updateMany(
+        { post: id, user: { $in: removedAssignedUserIds } },
+        { $set: { status: 'rejected' } },
+      );
+    }
 
     await checkPostStatus(updatedPost);
 
-    const calendarUpdate = {
-      title: `Photoshoot: ${updatedPost.title}`,
-      description: updatedPost.description,
-      date: updatedPost.date,
-    };
+    const calendarParticipants = Array.from(
+      new Set([
+        String(updatedPost.author),
+        ...(updatedPost.assignedTo || []).map(String),
+      ]),
+    );
+
     if (updatedPost.date) {
       await CalendarEvent.updateOne(
         { post: updatedPost._id },
-        { $set: calendarUpdate },
+        {
+          $set: {
+            title: `Photoshoot: ${updatedPost.title}`,
+            description: updatedPost.description,
+            date: updatedPost.date,
+            participants: calendarParticipants,
+            createdBy: updatedPost.author,
+            post: updatedPost._id,
+            type: 'post',
+            expired: false,
+          },
+        },
+        { upsert: true },
       );
+    } else {
+      await CalendarEvent.deleteOne({ post: updatedPost._id });
     }
 
     res.json({
