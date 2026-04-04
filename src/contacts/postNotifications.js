@@ -5,6 +5,7 @@ import createHttpError from 'http-errors';
 import PostCollection from '../db/models/Post.js';
 import { createNotification } from '../utils/notifications.js';
 import Application from '../db/models/Application.js';
+import { checkPostStatus } from '../services/postStatusService.js';
 /// ✅ Подать заявку на пост
 
 export const applyToPostController = async (req, res, next) => {
@@ -494,6 +495,215 @@ export const toggleInterestedController = async (req, res, next) => {
         ? 'Interest removed successfully'
         : 'User marked as interested',
       interestedCount: post.interestedUsers.length,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getMyApplicationsController = async (req, res, next) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      return next(createHttpError(401, 'User not authenticated'));
+    }
+
+    const { status } = req.query;
+
+    const query = { user: userId };
+    if (status) query.status = status;
+
+    const applications = await Application.find(query)
+      .populate({
+        path: 'post',
+        select:
+          'title description country city date status type price roleSlots applicationsCount createdAt author',
+        populate: {
+          path: 'author',
+          select: 'name surname photo role',
+        },
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const data = applications.map((app) => ({
+      ...app,
+      decision:
+        app.status === 'selected'
+          ? 'accepted'
+          : app.status === 'rejected'
+            ? 'rejected'
+            : app.status === 'withdrawn'
+              ? 'withdrawn'
+              : 'pending',
+    }));
+
+    res.json({
+      status: 200,
+      message: 'My applications fetched successfully',
+      data,
+      count: data.length,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// helpers
+const syncPostCalendarEvent = async (post) => {
+  const participants = Array.from(
+    new Set([
+      String(post.author),
+      ...(post.assignedTo || []).map((id) => String(id)),
+    ]),
+  );
+
+  if (!post.date) {
+    await CalendarEvent.deleteOne({ post: post._id });
+    return;
+  }
+
+  await CalendarEvent.findOneAndUpdate(
+    { post: post._id },
+    {
+      post: post._id,
+      type: 'post',
+      title: `Photoshoot: ${post.title}`,
+      description: post.description,
+      date: post.date,
+      participants,
+      createdBy: post.author,
+      expired: false,
+    },
+    {
+      upsert: true,
+      new: true,
+      setDefaultsOnInsert: true,
+    },
+  );
+};
+
+const removeUserFromAssignedSlots = (post, userId) => {
+  const uid = String(userId);
+
+  post.roleSlots = (post.roleSlots || []).map((slot) => ({
+    ...slot,
+    assigned: Array.isArray(slot.assigned)
+      ? slot.assigned.filter((id) => String(id) !== uid)
+      : [],
+  }));
+
+  post.assignedTo = (post.assignedTo || []).filter((id) => String(id) !== uid);
+};
+
+export const withdrawApplicationController = async (req, res, next) => {
+  try {
+    const userId = req.user?._id;
+    const { id } = req.params; // id заявки
+
+    if (!userId) {
+      return next(createHttpError(401, 'User not authenticated'));
+    }
+
+    const application = await Application.findById(id);
+    if (!application) {
+      return next(createHttpError(404, 'Application not found'));
+    }
+
+    if (String(application.user) !== String(userId)) {
+      return next(
+        createHttpError(403, 'You can withdraw only your own application'),
+      );
+    }
+
+    if (application.status !== 'applied') {
+      return next(
+        createHttpError(
+          400,
+          'You can withdraw only an application that is still pending',
+        ),
+      );
+    }
+
+    application.status = 'withdrawn';
+    await application.save();
+
+    const post = await PostCollection.findById(application.post);
+    if (post) {
+      post.applicationsCount = Math.max(0, (post.applicationsCount || 0) - 1);
+      await post.save();
+    }
+
+    res.json({
+      status: 200,
+      message: 'Application withdrawn successfully',
+      data: application,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const unassignCandidateController = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { applicationId } = req.body;
+
+    const currentUserId = req.user?._id;
+    if (!currentUserId) {
+      return next(createHttpError(401, 'User not authenticated'));
+    }
+
+    if (!applicationId) {
+      return next(createHttpError(400, 'applicationId is required'));
+    }
+
+    const post = await PostCollection.findById(id);
+    if (!post) {
+      return next(createHttpError(404, 'Post not found'));
+    }
+
+    if (String(post.author) !== String(currentUserId)) {
+      return next(
+        createHttpError(403, 'Only the post author can unassign candidates'),
+      );
+    }
+
+    const application = await Application.findById(applicationId);
+    if (!application) {
+      return next(createHttpError(404, 'Application not found'));
+    }
+
+    if (String(application.post) !== String(post._id)) {
+      return next(
+        createHttpError(400, 'Application does not belong to this post'),
+      );
+    }
+
+    if (application.status !== 'selected') {
+      return next(
+        createHttpError(400, 'Only selected candidates can be unassigned'),
+      );
+    }
+
+    const userId = application.user;
+
+    removeUserFromAssignedSlots(post, userId);
+
+    application.status = 'applied';
+    await application.save();
+
+    await checkPostStatus(post);
+
+    await syncPostCalendarEvent(post);
+
+    res.json({
+      status: 200,
+      message: 'Candidate unassigned successfully',
+      data: {
+        post,
+        application,
+      },
     });
   } catch (err) {
     next(err);

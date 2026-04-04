@@ -36,12 +36,32 @@ postsRouter.get(
   authenticate,
   ctrlWrapper(postsController.getMyPostsController),
 );
+
+postsRouter.patch(
+  '/applications/:id/withdraw',
+  authenticate,
+  checkBlocked,
+  ctrlWrapper(postNotifications.withdrawApplicationController),
+);
+
+postsRouter.patch(
+  '/:id/unassign',
+  authenticate,
+  checkBlocked,
+  ctrlWrapper(postNotifications.unassignCandidateController),
+);
+
 postsRouter.get(
   '/:id',
   optionalAuthenticate,
   ctrlWrapper(postsController.getPostByIdController),
 );
-
+postsRouter.get(
+  '/applications/mine',
+  authenticate,
+  checkBlocked,
+  ctrlWrapper(postNotifications.getMyApplicationsController),
+);
 postsRouter.get(
   '/:id/like',
   optionalAuthenticate,
