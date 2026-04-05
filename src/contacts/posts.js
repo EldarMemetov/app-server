@@ -515,23 +515,31 @@ export const getPostByIdController = async (req, res, next) => {
 };
 
 // 🗑️ Удалить пост
-export const deletePostController = async (req, res) => {
-  const { id } = req.params;
-  const userId = req.user._id;
+export const deletePostController = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
 
-  const post = await PostCollection.findById(id);
-  if (!post) throw createHttpError(404, 'Post not found');
+    const post = await PostCollection.findById(id);
+    if (!post) {
+      return next(createHttpError(404, 'Post not found'));
+    }
 
-  if (post.author.toString() !== userId.toString()) {
-    throw createHttpError(403, 'You can delete only your own posts');
+    if (post.author.toString() !== userId.toString()) {
+      return next(createHttpError(403, 'You can delete only your own posts'));
+    }
+
+    await Application.deleteMany({ post: post._id });
+    await CalendarEvent.deleteOne({ post: post._id });
+    await PostCollection.findByIdAndDelete(id);
+
+    res.json({
+      status: 200,
+      message: 'Post deleted successfully',
+    });
+  } catch (err) {
+    next(err);
   }
-
-  await PostCollection.findByIdAndDelete(id);
-
-  res.json({
-    status: 200,
-    message: 'Post deleted successfully',
-  });
 };
 
 export const toggleLikeController = async (req, res, next) => {
