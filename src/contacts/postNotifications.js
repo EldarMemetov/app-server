@@ -709,3 +709,53 @@ export const unassignCandidateController = async (req, res, next) => {
     next(err);
   }
 };
+
+export const rejectApplicationController = async (req, res, next) => {
+  try {
+    const { id: postId, applicationId } = req.params;
+
+    const currentUserId = req.user?._id;
+    if (!currentUserId) {
+      return next(createHttpError(401, 'User not authenticated'));
+    }
+
+    const post = await PostCollection.findById(postId);
+    if (!post) {
+      return next(createHttpError(404, 'Post not found'));
+    }
+
+    if (String(post.author) !== String(currentUserId)) {
+      return next(
+        createHttpError(403, 'Only the post author can reject applications'),
+      );
+    }
+
+    const application = await Application.findById(applicationId);
+    if (!application) {
+      return next(createHttpError(404, 'Application not found'));
+    }
+
+    if (String(application.post) !== String(post._id)) {
+      return next(
+        createHttpError(400, 'Application does not belong to this post'),
+      );
+    }
+
+    if (application.status === 'rejected') {
+      return next(createHttpError(400, 'Application already rejected'));
+    }
+
+    application.status = 'rejected';
+    await application.save();
+
+    await checkPostStatus(post);
+
+    res.json({
+      status: 200,
+      message: 'Application rejected successfully',
+      data: { post, application },
+    });
+  } catch (err) {
+    next(err);
+  }
+};

@@ -43,7 +43,11 @@ postsRouter.patch(
   checkBlocked,
   ctrlWrapper(postNotifications.withdrawApplicationController),
 );
-
+postsRouter.patch(
+  '/:id/applications/:applicationId/reject',
+  authenticate,
+  ctrlWrapper(postNotifications.rejectApplicationController),
+);
 postsRouter.patch(
   '/:id/unassign',
   authenticate,
