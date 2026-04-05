@@ -13,6 +13,11 @@ const calendarEventSchema = new Schema(
       enum: ['manual', 'post'],
       default: 'manual',
     },
+    status: {
+      type: String,
+      enum: ['active', 'canceled'],
+      default: 'active',
+    },
 
     expired: { type: Boolean, default: false },
 

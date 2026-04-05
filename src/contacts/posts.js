@@ -515,6 +515,32 @@ export const getPostByIdController = async (req, res, next) => {
 };
 
 // 🗑️ Удалить пост
+// export const deletePostController = async (req, res, next) => {
+//   try {
+//     const { id } = req.params;
+//     const userId = req.user._id;
+
+//     const post = await PostCollection.findById(id);
+//     if (!post) {
+//       return next(createHttpError(404, 'Post not found'));
+//     }
+
+//     if (post.author.toString() !== userId.toString()) {
+//       return next(createHttpError(403, 'You can delete only your own posts'));
+//     }
+
+//     await Application.deleteMany({ post: post._id });
+//     await CalendarEvent.deleteOne({ post: post._id });
+//     await PostCollection.findByIdAndDelete(id);
+
+//     res.json({
+//       status: 200,
+//       message: 'Post deleted successfully',
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
 export const deletePostController = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -529,8 +555,17 @@ export const deletePostController = async (req, res, next) => {
       return next(createHttpError(403, 'You can delete only your own posts'));
     }
 
-    await Application.deleteMany({ post: post._id });
-    await CalendarEvent.deleteOne({ post: post._id });
+    await CalendarEvent.findOneAndUpdate(
+      { post: post._id },
+      {
+        $set: {
+          status: 'canceled',
+          expired: true,
+          title: `Отменено: ${post.title}`,
+        },
+      },
+    );
+
     await PostCollection.findByIdAndDelete(id);
 
     res.json({
@@ -541,7 +576,6 @@ export const deletePostController = async (req, res, next) => {
     next(err);
   }
 };
-
 export const toggleLikeController = async (req, res, next) => {
   const { id } = req.params;
   const fromUserId = req.user && req.user._id;
