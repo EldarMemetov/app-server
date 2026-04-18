@@ -11,17 +11,26 @@ export const checkPostStatus = async (post) => {
 
   let newStatus = post.status;
 
+  // Не трогаем финальные статусы
+  if (['shooting_done', 'canceled', 'expired'].includes(post.status)) {
+    return post;
+  }
+
   if (post.date) {
     const postDate = new Date(post.date);
     const datePassed = postDate < now;
 
     if (datePassed) {
       if (allRolesFilled) {
-        newStatus = 'completed';
+        // Команда собрана, дата прошла — ждём подтверждения автора
+        // Оставляем in_progress, автор должен нажать "съёмка прошла"
+        newStatus = 'in_progress';
       } else {
-        newStatus = 'canceled';
+        // Команда НЕ собрана, дата прошла
+        newStatus = 'expired';
       }
     } else {
+      // Дата ещё не прошла
       if (allRolesFilled) {
         newStatus = 'in_progress';
       } else {
@@ -29,6 +38,7 @@ export const checkPostStatus = async (post) => {
       }
     }
   } else {
+    // Нет даты
     newStatus = allRolesFilled ? 'in_progress' : 'open';
   }
 

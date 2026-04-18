@@ -19,7 +19,7 @@ import locationRouter from './routers/locationRouter.js';
 import notificationsRouter from './routers/notificationsRouter.js';
 import favoritesRouter from './routers/favorites.js';
 import profilePublicRouter from './routers/profilePublicRouter.js';
-
+import reviewsRouter from './routers/reviews.js';
 import corsOptions from './utils/corsOptions.js';
 import { initSocket } from './socket/socket.js';
 import { updateAllPostsStatus } from './services/postStatusService.js';
@@ -52,7 +52,7 @@ export const setupServer = () => {
   app.use('/notifications', notificationsRouter);
   app.use('/favorites', favoritesRouter);
   app.use('/calendar', calendarRouter);
-
+  app.use('/', reviewsRouter);
   app.use(notFoundHandler);
   app.use(errorHandler);
 

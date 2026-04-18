@@ -17,7 +17,7 @@ const applicationSchema = new Schema(
     message: { type: String, default: '' },
     status: {
       type: String,
-      enum: ['applied', 'withdrawn', 'selected', 'rejected'],
+      enum: ['applied', 'withdrawn', 'selected', 'rejected', 'completed'],
       default: 'applied',
     },
   },

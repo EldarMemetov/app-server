@@ -6,8 +6,8 @@ import PostCollection from '../db/models/Post.js';
 import { createNotification } from '../utils/notifications.js';
 import Application from '../db/models/Application.js';
 import { checkPostStatus } from '../services/postStatusService.js';
-/// ✅ Подать заявку на пост
 
+/// ✅ Подать заявку на пост
 export const applyToPostController = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -74,9 +74,7 @@ export const applyToPostController = async (req, res, next) => {
       type: 'post',
       key: 'new_application',
       title: 'New application for your post',
-      message: `${req.user.name || 'User'} applied as ${appliedRole} for "${
-        post.title
-      }"`,
+      message: `${req.user.name || 'User'} applied as ${appliedRole} for "${post.title}"`,
       relatedPost: post._id,
       meta: {
         applicantId: userId,
@@ -361,6 +359,8 @@ export const assignCandidateController = async (req, res, next) => {
     next(err);
   }
 };
+
+// ✅ ОБНОВЛЁННЫЙ: Подтвердить что съёмка прошла (shooting_done)
 export const completePostController = async (req, res, next) => {
   try {
     const io = req.app?.get('io');
@@ -371,16 +371,22 @@ export const completePostController = async (req, res, next) => {
     if (!post) return next(createHttpError(404, 'Post not found'));
 
     if (post.author.toString() !== currentUserId.toString()) {
-      return next(createHttpError(403, 'Only the post author can complete it'));
+      return next(
+        createHttpError(403, 'Only the post author can confirm shooting'),
+      );
     }
 
     if (post.status !== 'in_progress') {
-      return next(createHttpError(400, 'Post is not in progress'));
+      return next(
+        createHttpError(400, 'Post must be in_progress to confirm shooting'),
+      );
     }
 
-    post.status = 'completed';
+    // Меняем статус на shooting_done
+    post.status = 'shooting_done';
     await post.save();
 
+    // Начисляем рейтинг и уведомляем участников
     if (Array.isArray(post.assignedTo) && post.assignedTo.length > 0) {
       await UserCollection.updateMany(
         { _id: { $in: post.assignedTo } },
@@ -400,9 +406,9 @@ export const completePostController = async (req, res, next) => {
         const notification = await createNotification({
           user: uid,
           type: 'post',
-          key: 'post_completed',
-          title: `Post "${post.title}" completed`,
-          message: `The post "${post.title}" in ${post.city} has been completed`,
+          key: 'shooting_completed',
+          title: `Съёмка "${post.title}" завершена!`,
+          message: 'Теперь вы можете оставить отзыв о проекте',
           relatedPost: post._id,
           meta: { postId: post._id, user: uid },
           unique: true,
@@ -416,7 +422,7 @@ export const completePostController = async (req, res, next) => {
 
     res.json({
       status: 200,
-      message: 'Post completed and ratings updated',
+      message: 'Shooting confirmed. Participants can now leave reviews.',
       data: post,
     });
   } catch (err) {
@@ -446,6 +452,7 @@ export const getUserNotifications = async (req, res) => {
     totalPages: Math.ceil(total / limit),
   });
 };
+
 export const markNotificationRead = async (req, res) => {
   const { id } = req.params;
   const userId = req.user._id;
@@ -464,6 +471,7 @@ export const markNotificationRead = async (req, res) => {
     data: notification,
   });
 };
+
 // 💼 Добавить / убрать заинтересованность
 export const toggleInterestedController = async (req, res, next) => {
   try {
@@ -535,7 +543,9 @@ export const getMyApplicationsController = async (req, res, next) => {
             ? 'rejected'
             : app.status === 'withdrawn'
               ? 'withdrawn'
-              : 'pending',
+              : app.status === 'completed'
+                ? 'completed'
+                : 'pending',
     }));
 
     res.json({
@@ -599,7 +609,7 @@ const removeUserFromAssignedSlots = (post, userId) => {
 export const withdrawApplicationController = async (req, res, next) => {
   try {
     const userId = req.user?._id;
-    const { id } = req.params; // id заявки
+    const { id } = req.params;
 
     if (!userId) {
       return next(createHttpError(401, 'User not authenticated'));

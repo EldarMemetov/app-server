@@ -35,7 +35,7 @@ const postSchema = new Schema(
 
     status: {
       type: String,
-      enum: ['open', 'in_progress', 'completed', 'canceled'],
+      enum: ['open', 'in_progress', 'shooting_done', 'expired', 'canceled'],
       default: 'open',
     },
 
