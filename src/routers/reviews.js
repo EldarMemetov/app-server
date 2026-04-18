@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import authenticate from '../middlewares/authenticate.js';
-import { upload } from '../middlewares/upload.js';
+import upload from '../middlewares/uploadMiddleware.js';
 import {
   confirmShootingController,
   addReviewController,
