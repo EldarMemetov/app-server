@@ -25,19 +25,27 @@ const postSchema = new Schema(
     roleSlots: { type: [roleSlotSchema], default: [] },
     country: { type: String, required: true },
     city: { type: String, required: true },
+
     date: { type: Date },
+    hasNoDate: { type: Boolean, default: false },
+
     type: {
       type: String,
-      enum: ['paid', 'tfp', 'collaboration'],
+      enum: ['tfp', 'percent', 'paid', 'negotiable'],
       default: 'tfp',
     },
+
     price: { type: Number, default: 0 },
+
+    percent: { type: Number, default: 0, min: 0, max: 100 },
 
     status: {
       type: String,
       enum: ['open', 'in_progress', 'shooting_done', 'expired', 'canceled'],
       default: 'open',
     },
+
+    extensionOffered: { type: Boolean, default: false },
 
     applicationsCount: { type: Number, default: 0 },
     assignedTo: [{ type: Schema.Types.ObjectId, ref: 'user' }],
@@ -49,6 +57,8 @@ const postSchema = new Schema(
   },
   { timestamps: true, versionKey: false },
 );
+
 postSchema.index({ author: 1, status: 1 });
 postSchema.index({ status: 1, date: 1 });
+
 export default model('post', postSchema);

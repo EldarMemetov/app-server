@@ -52,6 +52,7 @@ const isDateInPastBerlin = (input) => {
   const berlinToday = new Date(berlinDateStr);
   const parsedDateOnly = new Date(parsed.toISOString().slice(0, 10));
 
+  // Разрешаем сегодняшнюю дату (< вместо <=)
   return parsedDateOnly < berlinToday;
 };
 
@@ -66,10 +67,13 @@ export const createPostWithMediaController = async (req, res, next) => {
       country,
       city,
       date,
+      hasNoDate,
       type,
       price,
+      percent,
       maxAssigned,
     } = req.body;
+
     if (!title || !description || !country || !city)
       return next(createHttpError(400, 'Missing required fields'));
 
@@ -79,7 +83,8 @@ export const createPostWithMediaController = async (req, res, next) => {
       return next(createHttpError(400, 'At least one role must be specified'));
     }
 
-    if (date) {
+    // Валидация даты (только если указана)
+    if (date && !hasNoDate) {
       const parsed = new Date(date);
       if (isNaN(parsed.getTime()))
         return next(createHttpError(400, 'Invalid date format'));
@@ -89,24 +94,48 @@ export const createPostWithMediaController = async (req, res, next) => {
       }
     }
 
+    // Валидация типа оплаты
+    const paymentType = type || 'tfp';
+    let finalPrice = 0;
+    let finalPercent = 0;
+
+    if (paymentType === 'paid') {
+      finalPrice = Number(price) || 0;
+      if (finalPrice <= 0) {
+        return next(createHttpError(400, 'Price is required for paid type'));
+      }
+    } else if (paymentType === 'percent') {
+      finalPercent = Number(percent) || 0;
+      if (finalPercent <= 0 || finalPercent > 100) {
+        return next(createHttpError(400, 'Percent must be between 1 and 100'));
+      }
+    }
+    // tfp и negotiable не требуют суммы
+
     const postData = {
       author: userId,
       title: String(title).trim(),
       description: String(description),
       country: String(country),
       city: String(city),
-      type: type || 'tfp',
-      price: Number(price) || 0,
+      type: paymentType,
+      price: finalPrice,
+      percent: finalPercent,
+      hasNoDate: Boolean(hasNoDate),
       roleSlots,
       maxAssigned: typeof maxAssigned === 'number' ? maxAssigned : 5,
     };
 
-    if (date) {
+    // Дата только если указана и hasNoDate = false
+    if (date && !hasNoDate) {
       postData.date = new Date(date);
     }
 
     const newPost = await PostCollection.create(postData);
     await checkPostStatus(newPost);
+
+    // ... остальной код с медиа без изменений ...
+
     if (req.files && req.files.length > 0) {
       if (req.files.length > 5) {
         return next(createHttpError(400, 'Too many files (max 5)'));
@@ -162,8 +191,10 @@ export const createPostController = async (req, res, next) => {
       country,
       city,
       date,
+      hasNoDate,
       type,
       price,
+      percent,
       roleNeeded,
       roleSlots: incomingRoleSlots,
       maxAssigned,
@@ -182,7 +213,8 @@ export const createPostController = async (req, res, next) => {
       return next(createHttpError(400, 'At least one role must be specified'));
     }
 
-    if (date) {
+    // Валидация даты
+    if (date && !hasNoDate) {
       const parsed = new Date(date);
       if (Number.isNaN(parsed.getTime())) {
         return next(createHttpError(400, 'Invalid date format'));
@@ -192,19 +224,38 @@ export const createPostController = async (req, res, next) => {
       }
     }
 
+    // Валидация типа оплаты
+    const paymentType = type || 'tfp';
+    let finalPrice = 0;
+    let finalPercent = 0;
+
+    if (paymentType === 'paid') {
+      finalPrice = Number(price) || 0;
+      if (finalPrice <= 0) {
+        return next(createHttpError(400, 'Price is required for paid type'));
+      }
+    } else if (paymentType === 'percent') {
+      finalPercent = Number(percent) || 0;
+      if (finalPercent <= 0 || finalPercent > 100) {
+        return next(createHttpError(400, 'Percent must be between 1 and 100'));
+      }
+    }
+
     const createData = {
       author: userId,
       title: String(title).trim(),
       description: String(description),
       country: String(country),
       city: String(city),
-      type: type || 'tfp',
-      price: Number(price) || 0,
+      type: paymentType,
+      price: finalPrice,
+      percent: finalPercent,
+      hasNoDate: Boolean(hasNoDate),
       roleSlots,
       maxAssigned: typeof maxAssigned === 'number' ? maxAssigned : 5,
     };
 
-    if (date) {
+    if (date && !hasNoDate) {
       createData.date = new Date(date);
     }
 
@@ -215,6 +266,75 @@ export const createPostController = async (req, res, next) => {
     res.status(201).json({
       status: 201,
       message: 'Post created successfully',
+      data: post,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Добавь новый эндпоинт для продления даты
+export const extendPostDateController = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { newDate } = req.body;
+    const userId = req.user._id;
+
+    const post = await PostCollection.findById(id);
+    if (!post) return next(createHttpError(404, 'Post not found'));
+
+    if (post.author.toString() !== userId.toString()) {
+      return next(
+        createHttpError(403, 'Only the post author can extend the date'),
+      );
+    }
+
+    if (post.status !== 'expired') {
+      return next(createHttpError(400, 'Only expired posts can be extended'));
+    }
+
+    if (!newDate) {
+      return next(createHttpError(400, 'New date is required'));
+    }
+
+    const parsed = new Date(newDate);
+    if (isNaN(parsed.getTime())) {
+      return next(createHttpError(400, 'Invalid date format'));
+    }
+
+    if (isDateInPastBerlin(parsed)) {
+      return next(createHttpError(400, 'New date cannot be in the past'));
+    }
+
+    post.date = parsed;
+    post.status = 'open';
+    post.extensionOffered = false;
+    await post.save();
+
+    // Обновляем календарь
+    const participants = Array.from(
+      new Set([String(post.author), ...(post.assignedTo || []).map(String)]),
+    );
+
+    await CalendarEvent.findOneAndUpdate(
+      { post: post._id },
+      {
+        post: post._id,
+        type: 'post',
+        title: `Photoshoot: ${post.title}`,
+        description: post.description,
+        date: post.date,
+        participants,
+        createdBy: post.author,
+        expired: false,
+        status: 'active',
+      },
+      { upsert: true, new: true },
+    );
+
+    res.json({
+      status: 200,
+      message: 'Post date extended successfully',
       data: post,
     });
   } catch (err) {
@@ -514,33 +634,6 @@ export const getPostByIdController = async (req, res, next) => {
   }
 };
 
-// 🗑️ Удалить пост
-// export const deletePostController = async (req, res, next) => {
-//   try {
-//     const { id } = req.params;
-//     const userId = req.user._id;
-
-//     const post = await PostCollection.findById(id);
-//     if (!post) {
-//       return next(createHttpError(404, 'Post not found'));
-//     }
-
-//     if (post.author.toString() !== userId.toString()) {
-//       return next(createHttpError(403, 'You can delete only your own posts'));
-//     }
-
-//     await Application.deleteMany({ post: post._id });
-//     await CalendarEvent.deleteOne({ post: post._id });
-//     await PostCollection.findByIdAndDelete(id);
-
-//     res.json({
-//       status: 200,
-//       message: 'Post deleted successfully',
-//     });
-//   } catch (err) {
-//     next(err);
-//   }
-// };
 export const deletePostController = async (req, res, next) => {
   try {
     const { id } = req.params;

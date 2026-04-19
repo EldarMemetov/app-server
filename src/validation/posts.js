@@ -25,9 +25,16 @@ export const createPostSchema = Joi.object({
 
   country: Joi.string().min(2).max(100).required(),
   city: Joi.string().min(2).max(50).required(),
-  date: Joi.date().min('now').required(),
-  type: Joi.string().valid('paid', 'tfp', 'collaboration').optional(),
+
+  date: Joi.date().optional().allow(null),
+  hasNoDate: Joi.boolean().optional(),
+
+  type: Joi.string().valid('tfp', 'percent', 'paid', 'negotiable').optional(),
+
   price: Joi.number().min(0).optional(),
+
+  percent: Joi.number().min(0).max(100).optional(),
+
   maxAssigned: Joi.number().min(1).optional(),
 });
 

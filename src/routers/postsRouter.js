@@ -184,5 +184,10 @@ postsRouter.post(
   upload.array('files', 5),
   ctrlWrapper(postMediaController.uploadPostMediaController),
 );
+postsRouter.patch(
+  '/:id/extend',
+  authenticate,
+  postsController.extendPostDateController,
+);
 
 export default postsRouter;
