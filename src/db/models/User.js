@@ -4,6 +4,18 @@ import { handleSaveError, setupUpdateOptions } from './hooks.js';
 import { roles } from '../../constants/roles.js';
 import { directionsEnum } from '../../constants/rolesEnum.js';
 
+const socialLinksSchema = new Schema(
+  {
+    telegram: { type: String, default: '' },
+    whatsapp: { type: String, default: '' },
+    instagram: { type: String, default: '' },
+    facebook: { type: String, default: '' },
+    linkedin: { type: String, default: '' },
+    website: { type: String, default: '' },
+  },
+  { _id: false },
+);
+
 const userSchema = new Schema(
   {
     name: { type: String, required: true },
@@ -47,21 +59,30 @@ const userSchema = new Schema(
 
     isBlocked: { type: Boolean, default: false },
     likesCount: { type: Number, default: 0 },
+
     portfolio: [
       {
         type: { type: String, enum: ['photo', 'video'], required: true },
         url: { type: String, required: true },
+        // для видео — ссылка на YouTube/Vimeo/etc, для фото — Cloudinary url
+        videoLink: { type: String, default: '' },
         description: { type: String, default: '' },
         public_id: { type: String },
       },
     ],
+
+    // Все соцсети и сайт сгруппированы в одном объекте
+    socialLinks: {
+      type: socialLinksSchema,
+      default: () => ({}),
+    },
+
     availability: {
       type: String,
       enum: ['local', 'country', 'international'],
       default: 'local',
     },
     languages: { type: [String], default: [] },
-    website: { type: String, default: '' },
 
     needsReview: { type: Boolean, default: false },
   },
