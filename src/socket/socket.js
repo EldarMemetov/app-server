@@ -1,6 +1,8 @@
 import UserCollection from '../db/models/User.js';
 import SessionCollection from '../db/models/Session.js';
 
+const ALLOWED_ROOM_RE = /^(post|forumTopic):[a-f0-9]{24}$/i;
+
 export const initSocket = (io) => {
   io.userSockets = new Map();
 
@@ -128,6 +130,29 @@ export const initSocket = (io) => {
 
       io.broadcastUserStatus(userId, true);
 
+      // --- Универсальные комнаты для комментариев (posts + forumTopic) ---
+      socket.on('joinRoom', (room) => {
+        try {
+          if (typeof room !== 'string' || !ALLOWED_ROOM_RE.test(room)) {
+            console.warn('[socket] joinRoom rejected:', room);
+            return;
+          }
+          socket.join(room);
+        } catch (e) {
+          console.warn('[socket] joinRoom error', e);
+        }
+      });
+
+      socket.on('leaveRoom', (room) => {
+        try {
+          if (typeof room !== 'string' || !ALLOWED_ROOM_RE.test(room)) return;
+          socket.leave(room);
+        } catch (e) {
+          console.warn('[socket] leaveRoom error', e);
+        }
+      });
+
+      // --- Legacy-события для постов (оставлены для обратной совместимости) ---
       socket.on('joinPost', (postId) => {
         try {
           if (!postId) return;
