@@ -3,14 +3,17 @@ import createHttpError from 'http-errors';
 import Favorite from '../db/models/Favorite.js';
 import PostCollection from '../db/models/Post.js';
 import UserCollection from '../db/models/User.js';
+import ForumTopicCollection from '../db/models/ForumTopic.js'; // ← добавить импорт
 
 const TARGET_MAP = {
   post: PostCollection,
   user: UserCollection,
+  forumTopic: ForumTopicCollection, // ← добавить в мапу
 };
 
 export const toggleFavorite = async ({ userId, targetType, targetId }) => {
-  if (!['post', 'user'].includes(targetType)) {
+  if (!['post', 'user', 'forumTopic'].includes(targetType)) {
+    // ← + forumTopic
     throw createHttpError(400, 'Invalid targetType');
   }
 
@@ -60,23 +63,37 @@ export const getMyFavoritesController = async (req, res, next) => {
       .lean();
 
     const ids = favDocs.map((f) => String(f.targetId));
+
     if (targetType === 'post') {
       const posts = await PostCollection.find({ _id: { $in: ids } })
         .populate('author', 'name surname photo')
         .lean();
-
-      const postsById = new Map(posts.map((p) => [String(p._id), p]));
-      const ordered = ids.map((id) => postsById.get(id)).filter(Boolean);
-
-      return res.json({
-        status: 200,
-        data: ordered,
-        page,
-        limit,
-      });
-    } else {
-      return res.json({ status: 200, data: [], page, limit });
+      const byId = new Map(posts.map((p) => [String(p._id), p]));
+      const ordered = ids.map((id) => byId.get(id)).filter(Boolean);
+      return res.json({ status: 200, data: ordered, page, limit });
     }
+
+    if (targetType === 'forumTopic') {
+      // ← новая ветка
+      const topics = await ForumTopicCollection.find({ _id: { $in: ids } })
+        .populate('author', 'name surname photo')
+        .lean();
+      const byId = new Map(topics.map((t) => [String(t._id), t]));
+      const ordered = ids.map((id) => byId.get(id)).filter(Boolean);
+      return res.json({ status: 200, data: ordered, page, limit });
+    }
+
+    if (targetType === 'user') {
+      // ← сразу заодно закроем
+      const users = await UserCollection.find({ _id: { $in: ids } })
+        .select('-password')
+        .lean();
+      const byId = new Map(users.map((u) => [String(u._id), u]));
+      const ordered = ids.map((id) => byId.get(id)).filter(Boolean);
+      return res.json({ status: 200, data: ordered, page, limit });
+    }
+
+    return res.json({ status: 200, data: [], page, limit });
   } catch (err) {
     next(err);
   }

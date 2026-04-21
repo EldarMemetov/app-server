@@ -2,12 +2,19 @@ import { Schema, model } from 'mongoose';
 
 const commentSchema = new Schema(
   {
-    postId: {
+    // Вместо postId — универсальная пара
+    targetType: {
+      type: String,
+      required: true,
+      enum: ['post', 'forumTopic'], // расширяемо
+      index: true,
+    },
+    targetId: {
       type: Schema.Types.ObjectId,
-      ref: 'post',
       required: true,
       index: true,
     },
+
     author: {
       type: Schema.Types.ObjectId,
       ref: 'user',
@@ -27,12 +34,11 @@ const commentSchema = new Schema(
       enum: ['visible', 'hidden', 'reported'],
       default: 'visible',
     },
-
     likesCount: { type: Number, default: 0 },
   },
   { timestamps: true },
 );
 
-commentSchema.index({ postId: 1, createdAt: -1 });
+commentSchema.index({ targetType: 1, targetId: 1, createdAt: -1 });
 
 export default model('comment', commentSchema);

@@ -3,12 +3,15 @@ import createHttpError from 'http-errors';
 import LikeCollection from '../db/models/like.js';
 import UserCollection from '../db/models/User.js';
 import PostCollection from '../db/models/Post.js';
-import { NotificationService } from '../utils/notificationService.js';
 import CommentCollection from '../db/models/Comment.js';
+import ForumTopicCollection from '../db/models/ForumTopic.js';
+import { NotificationService } from '../utils/notificationService.js';
+
 const TARGET_MAP = {
   user: { model: UserCollection, getOwnerId: (doc) => doc._id },
   post: { model: PostCollection, getOwnerId: (doc) => doc.author },
   comment: { model: CommentCollection, getOwnerId: (doc) => doc.author },
+  forumTopic: { model: ForumTopicCollection, getOwnerId: (doc) => doc.author },
 };
 
 export const toggleLike = async ({
@@ -17,11 +20,10 @@ export const toggleLike = async ({
   targetId,
   io = null,
 }) => {
-  if (!['user', 'post', 'comment', 'message'].includes(targetType)) {
+  if (
+    !['user', 'post', 'comment', 'message', 'forumTopic'].includes(targetType)
+  ) {
     throw createHttpError(400, 'Invalid targetType');
-  }
-  if (!mongoose.Types.ObjectId.isValid(targetId)) {
-    throw createHttpError(400, 'Invalid targetId');
   }
   if (!fromUserId) throw createHttpError(401, 'User not authenticated');
   if (targetType === 'user' && String(fromUserId) === String(targetId)) {

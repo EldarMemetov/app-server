@@ -14,7 +14,9 @@ export const toggleCommentLikeController = async (req, res, next) => {
     if (!commentId || !mongoose.Types.ObjectId.isValid(commentId))
       return next(createHttpError(400, 'Invalid comment id'));
 
-    const comment = await Comment.findById(commentId).select('postId').lean();
+    const comment = await Comment.findById(commentId)
+      .select('targetType targetId')
+      .lean();
     if (!comment) return next(createHttpError(404, 'Comment not found'));
 
     const result = await toggleLike({
@@ -25,13 +27,16 @@ export const toggleCommentLikeController = async (req, res, next) => {
     });
 
     try {
-      if (io && comment.postId) {
-        io.to(`post:${String(comment.postId)}`).emit('comment:like', {
-          commentId: String(commentId),
-          liked: result.liked,
-          likesCount: result.likesCount ?? 0,
-          byUserId: String(fromUserId),
-        });
+      if (io && comment.targetId) {
+        io.to(`${comment.targetType}:${String(comment.targetId)}`).emit(
+          'comment:like',
+          {
+            commentId: String(commentId),
+            liked: result.liked,
+            likesCount: result.likesCount ?? 0,
+            byUserId: String(fromUserId),
+          },
+        );
       }
     } catch (e) {
       console.error('emit comment:like error', e);

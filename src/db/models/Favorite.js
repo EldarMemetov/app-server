@@ -10,7 +10,7 @@ const favoriteSchema = new Schema(
     },
     targetType: {
       type: String,
-      enum: ['post', 'user'],
+      enum: ['post', 'user', 'forumTopic'],
       required: true,
     },
     targetId: {

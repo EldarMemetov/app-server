@@ -7,7 +7,7 @@ const likeSchema = new Schema(
     targetType: {
       type: String,
       required: true,
-      enum: ['user', 'post', 'comment', 'message'],
+      enum: ['user', 'post', 'comment', 'message', 'forumTopic'],
     },
     targetId: { type: Schema.Types.ObjectId, required: true },
   },

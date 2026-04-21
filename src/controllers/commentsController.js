@@ -2,32 +2,45 @@ import createHttpError from 'http-errors';
 import mongoose from 'mongoose';
 import Comment from '../db/models/Comment.js';
 import PostCollection from '../db/models/Post.js';
+import ForumTopicCollection from '../db/models/ForumTopic.js';
 import UserCollection from '../db/models/User.js';
 import LikeCollection from '../db/models/like.js';
-
 import { NotificationService } from '../utils/notificationService.js';
+
 const getCommentIdFromParams = (params) =>
   params.commentId || params.id || null;
 
-const getPostIdFromParams = (params) => params.id || params.postId || null;
+// Определяем target по роуту: /posts/:id/... или /forum/:id/...
+const getTargetFromReq = (req) => {
+  const targetId = req.params.id || req.params.postId || req.params.topicId;
+  const isForum = (req.baseUrl || req.originalUrl || '').includes('/forum');
+  return { targetType: isForum ? 'forumTopic' : 'post', targetId };
+};
+
+const TARGET_MODELS = {
+  post: PostCollection,
+  forumTopic: ForumTopicCollection,
+};
 
 export const addCommentController = async (req, res, next) => {
   try {
-    const postId = getPostIdFromParams(req.params);
+    const { targetType, targetId } = getTargetFromReq(req);
     const userId = req.user && req.user._id;
     const rawText = req.body?.text;
     const parentComment = req.body?.parentComment ?? null;
     const replyTo = req.body?.replyTo ?? null;
 
     if (!userId) return next(createHttpError(401, 'User not authenticated'));
-    if (!postId || !mongoose.Types.ObjectId.isValid(postId))
-      return next(createHttpError(400, 'Invalid post id'));
+    if (!targetId || !mongoose.Types.ObjectId.isValid(targetId))
+      return next(createHttpError(400, `Invalid ${targetType} id`));
 
     const text = typeof rawText === 'string' ? rawText.trim() : '';
     if (!text) return next(createHttpError(400, 'Comment text is required'));
 
-    const postExists = await PostCollection.exists({ _id: postId });
-    if (!postExists) return next(createHttpError(404, 'Post not found'));
+    const TargetModel = TARGET_MODELS[targetType];
+    const targetExists = await TargetModel.exists({ _id: targetId });
+    if (!targetExists)
+      return next(createHttpError(404, `${targetType} not found`));
 
     let parent = null;
     if (parentComment) {
@@ -35,32 +48,40 @@ export const addCommentController = async (req, res, next) => {
         return next(createHttpError(400, 'Invalid parentComment id'));
 
       parent = await Comment.findById(parentComment)
-        .select('postId author')
+        .select('targetType targetId author')
         .lean();
 
       if (!parent)
         return next(createHttpError(404, 'Parent comment not found'));
 
-      if (String(parent.postId) !== String(postId))
+      if (
+        String(parent.targetId) !== String(targetId) ||
+        parent.targetType !== targetType
+      )
         return next(
-          createHttpError(400, 'Parent comment belongs to another post'),
+          createHttpError(400, 'Parent comment belongs to another target'),
         );
     }
 
     if (replyTo) {
       if (!mongoose.Types.ObjectId.isValid(replyTo))
         return next(createHttpError(400, 'Invalid replyTo id'));
-
       const u = await UserCollection.findById(replyTo).select('_id').lean();
       if (!u) return next(createHttpError(404, 'Reply-to user not found'));
     }
 
     const doc = await Comment.create({
-      postId,
+      targetType,
+      targetId,
       author: userId,
       text,
       parentComment: parentComment || null,
       replyTo: replyTo || null,
+    });
+
+    // Инкрементим commentsCount у таргета (если поле есть)
+    await TargetModel.findByIdAndUpdate(targetId, {
+      $inc: { commentsCount: 1 },
     });
 
     const populated = await Comment.findById(doc._id)
@@ -73,15 +94,17 @@ export const addCommentController = async (req, res, next) => {
         fromUserId: userId,
         parentComment: parent,
         text,
-        postId,
+        postId: targetType === 'post' ? targetId : null,
+        // можешь расширить NotificationService полями targetType/targetId
       });
     }
 
     try {
       const io = req.app?.get('io');
       if (io) {
-        io.to(`post:${String(postId)}`).emit('comment:new', {
-          postId: String(postId),
+        io.to(`${targetType}:${String(targetId)}`).emit('comment:new', {
+          targetType,
+          targetId: String(targetId),
           comment: populated,
         });
       }
@@ -101,15 +124,15 @@ export const addCommentController = async (req, res, next) => {
 
 export const getCommentsController = async (req, res, next) => {
   try {
-    const postId = getPostIdFromParams(req.params);
+    const { targetType, targetId } = getTargetFromReq(req);
     const page = Math.max(1, Number(req.query.page || 1));
     const limit = Math.min(100, Number(req.query.limit || 20));
     const skip = (page - 1) * limit;
 
-    if (!postId || !mongoose.Types.ObjectId.isValid(postId))
-      return next(createHttpError(400, 'Invalid post id'));
+    if (!targetId || !mongoose.Types.ObjectId.isValid(targetId))
+      return next(createHttpError(400, `Invalid ${targetType} id`));
 
-    const query = { postId, deleted: false };
+    const query = { targetType, targetId, deleted: false };
 
     const [items, total] = await Promise.all([
       Comment.find(query)
@@ -121,8 +144,9 @@ export const getCommentsController = async (req, res, next) => {
         .lean(),
       Comment.countDocuments(query),
     ]);
+
     const maybeUserId = req.user?._id;
-    if (maybeUserId && Array.isArray(items) && items.length > 0) {
+    if (maybeUserId && items.length > 0) {
       const ids = items.map((c) => String(c._id));
       const likes = await LikeCollection.find({
         fromUserId: maybeUserId,
@@ -131,7 +155,6 @@ export const getCommentsController = async (req, res, next) => {
       })
         .select('targetId')
         .lean();
-
       const likedSet = new Set(likes.map((l) => String(l.targetId)));
       items.forEach((c) => {
         c.liked = likedSet.has(String(c._id));
@@ -141,6 +164,7 @@ export const getCommentsController = async (req, res, next) => {
         c.liked = false;
       });
     }
+
     res.json({
       status: 200,
       data: items,
@@ -188,10 +212,14 @@ export const updateCommentController = async (req, res, next) => {
     try {
       const io = req.app?.get('io');
       if (io) {
-        io.to(`post:${String(comment.postId)}`).emit('comment:updated', {
-          postId: String(comment.postId),
-          comment: populated,
-        });
+        io.to(`${comment.targetType}:${String(comment.targetId)}`).emit(
+          'comment:updated',
+          {
+            targetType: comment.targetType,
+            targetId: String(comment.targetId),
+            comment: populated,
+          },
+        );
       }
     } catch (e) {
       console.error('comment emit error (updated):', e);
@@ -219,19 +247,23 @@ export const deleteCommentController = async (req, res, next) => {
     const comment = await Comment.findById(commentId);
     if (!comment) return next(createHttpError(404, 'Comment not found'));
 
-    const post = await PostCollection.findById(comment.postId)
-      .select('author')
-      .lean();
-    const isPostAuthor = post && String(post.author) === String(userId);
+    // Автор цели тоже может удалить коммент у себя
+    let isTargetAuthor = false;
+    if (comment.targetType === 'post') {
+      const post = await PostCollection.findById(comment.targetId)
+        .select('author')
+        .lean();
+      isTargetAuthor = post && String(post.author) === String(userId);
+    } else if (comment.targetType === 'forumTopic') {
+      const topic = await ForumTopicCollection.findById(comment.targetId)
+        .select('author')
+        .lean();
+      isTargetAuthor = topic && String(topic.author) === String(userId);
+    }
     const isCommentAuthor = String(comment.author) === String(userId);
 
-    if (!isCommentAuthor && !isPostAuthor && req.user.role !== 'admin') {
-      return next(
-        createHttpError(
-          403,
-          'You can delete only your comments or comments on your posts',
-        ),
-      );
+    if (!isCommentAuthor && !isTargetAuthor && req.user.role !== 'admin') {
+      return next(createHttpError(403, 'Not allowed'));
     }
 
     comment.deleted = true;
@@ -240,10 +272,14 @@ export const deleteCommentController = async (req, res, next) => {
     try {
       const io = req.app?.get('io');
       if (io) {
-        io.to(`post:${String(comment.postId)}`).emit('comment:deleted', {
-          postId: String(comment.postId),
-          commentId: String(comment._id),
-        });
+        io.to(`${comment.targetType}:${String(comment.targetId)}`).emit(
+          'comment:deleted',
+          {
+            targetType: comment.targetType,
+            targetId: String(comment.targetId),
+            commentId: String(comment._id),
+          },
+        );
       }
     } catch (e) {
       console.error('comment emit error (deleted):', e);

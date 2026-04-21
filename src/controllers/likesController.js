@@ -146,3 +146,21 @@ export const toggleLikeController = async (req, res, next) => {
     return next(err);
   }
 };
+export const toggleForumTopicLikeController = async (req, res, next) => {
+  const fromUserId = req.user?._id;
+  const io = req.app.get('io');
+  try {
+    const result = await toggleLike({
+      fromUserId,
+      targetType: 'forumTopic',
+      targetId: req.params.id,
+      io,
+    });
+    res.json({
+      status: 200,
+      data: { liked: result.liked, likesCount: result.likesCount },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
