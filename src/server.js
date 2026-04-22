@@ -20,10 +20,13 @@ import notificationsRouter from './routers/notificationsRouter.js';
 import favoritesRouter from './routers/favorites.js';
 import profilePublicRouter from './routers/profilePublicRouter.js';
 import reviewsRouter from './routers/reviews.js';
+import calendarRouter from './routers/calendarRouter.js';
+import forumRouter from './routers/forumRouter.js'; // ← NEW
+
 import corsOptions from './utils/corsOptions.js';
 import { initSocket } from './socket/socket.js';
 import { updateAllPostsStatus } from './services/postStatusService.js';
-import calendarRouter from './routers/calendarRouter.js';
+
 export const setupServer = () => {
   const app = express();
   const port = Number(env('PORT', 3000));
@@ -46,6 +49,7 @@ export const setupServer = () => {
   app.use('/profile', profileRouter);
   app.use('/people', profilePublicRouter);
   app.use('/posts', postsRouter);
+  app.use('/forum', forumRouter); // ← NEW
   app.use('/moderation', moderatorRouter);
   app.use('/portfolio', portfolioRouter);
   app.use('/location', locationRouter);
@@ -53,6 +57,7 @@ export const setupServer = () => {
   app.use('/favorites', favoritesRouter);
   app.use('/calendar', calendarRouter);
   app.use('/', reviewsRouter);
+
   app.use(notFoundHandler);
   app.use(errorHandler);
 
