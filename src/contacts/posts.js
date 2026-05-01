@@ -52,7 +52,6 @@ const isDateInPastBerlin = (input) => {
   const berlinToday = new Date(berlinDateStr);
   const parsedDateOnly = new Date(parsed.toISOString().slice(0, 10));
 
-  // Разрешаем сегодняшнюю дату (< вместо <=)
   return parsedDateOnly < berlinToday;
 };
 
@@ -83,7 +82,6 @@ export const createPostWithMediaController = async (req, res, next) => {
       return next(createHttpError(400, 'At least one role must be specified'));
     }
 
-    // Валидация даты (только если указана)
     if (date && !hasNoDate) {
       const parsed = new Date(date);
       if (isNaN(parsed.getTime()))
@@ -94,7 +92,6 @@ export const createPostWithMediaController = async (req, res, next) => {
       }
     }
 
-    // Валидация типа оплаты
     const paymentType = type || 'tfp';
     let finalPrice = 0;
     let finalPercent = 0;
@@ -110,7 +107,6 @@ export const createPostWithMediaController = async (req, res, next) => {
         return next(createHttpError(400, 'Percent must be between 1 and 100'));
       }
     }
-    // tfp и negotiable не требуют суммы
 
     const postData = {
       author: userId,
@@ -126,15 +122,12 @@ export const createPostWithMediaController = async (req, res, next) => {
       maxAssigned: typeof maxAssigned === 'number' ? maxAssigned : 5,
     };
 
-    // Дата только если указана и hasNoDate = false
     if (date && !hasNoDate) {
       postData.date = new Date(date);
     }
 
     const newPost = await PostCollection.create(postData);
     await checkPostStatus(newPost);
-
-    // ... остальной код с медиа без изменений ...
 
     if (req.files && req.files.length > 0) {
       if (req.files.length > 5) {
@@ -213,7 +206,6 @@ export const createPostController = async (req, res, next) => {
       return next(createHttpError(400, 'At least one role must be specified'));
     }
 
-    // Валидация даты
     if (date && !hasNoDate) {
       const parsed = new Date(date);
       if (Number.isNaN(parsed.getTime())) {
@@ -224,7 +216,6 @@ export const createPostController = async (req, res, next) => {
       }
     }
 
-    // Валидация типа оплаты
     const paymentType = type || 'tfp';
     let finalPrice = 0;
     let finalPercent = 0;
@@ -273,7 +264,6 @@ export const createPostController = async (req, res, next) => {
   }
 };
 
-// Добавь новый эндпоинт для продления даты
 export const extendPostDateController = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -311,7 +301,6 @@ export const extendPostDateController = async (req, res, next) => {
     post.extensionOffered = false;
     await post.save();
 
-    // Обновляем календарь
     const participants = Array.from(
       new Set([String(post.author), ...(post.assignedTo || []).map(String)]),
     );
@@ -589,7 +578,9 @@ export const getPostByIdController = async (req, res, next) => {
       const myApp = await Application.findOne({
         post: id,
         user: userId,
+        status: { $in: ['applied', 'selected', 'completed'] },
       }).lean();
+
       post.appliedByMe = Boolean(myApp);
       post.appliedRoleByMe = myApp ? myApp.appliedRole : null;
     } else {

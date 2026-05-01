@@ -53,16 +53,38 @@ export const applyToPostController = async (req, res, next) => {
     }
 
     const existing = await Application.findOne({ post: id, user: userId });
-    if (existing) {
+
+    if (
+      existing &&
+      ['applied', 'selected', 'completed'].includes(existing.status)
+    ) {
       return next(createHttpError(400, 'You already applied to this post'));
     }
 
-    const application = await Application.create({
-      post: id,
-      user: userId,
-      appliedRole,
-      message: message || '',
-    });
+    if (existing && existing.status === 'rejected') {
+      return next(
+        createHttpError(
+          400,
+          'Your application was rejected. You cannot apply again.',
+        ),
+      );
+    }
+
+    let application;
+
+    if (existing && existing.status === 'withdrawn') {
+      existing.status = 'applied';
+      existing.appliedRole = appliedRole;
+      existing.message = message || '';
+      application = await existing.save();
+    } else {
+      application = await Application.create({
+        post: id,
+        user: userId,
+        appliedRole,
+        message: message || '',
+      });
+    }
 
     await PostCollection.findByIdAndUpdate(id, {
       $inc: { applicationsCount: 1 },
@@ -360,7 +382,6 @@ export const assignCandidateController = async (req, res, next) => {
   }
 };
 
-// ✅ ОБНОВЛЁННЫЙ: Подтвердить что съёмка прошла (shooting_done)
 export const completePostController = async (req, res, next) => {
   try {
     const io = req.app?.get('io');
@@ -382,11 +403,9 @@ export const completePostController = async (req, res, next) => {
       );
     }
 
-    // Меняем статус на shooting_done
     post.status = 'shooting_done';
     await post.save();
 
-    // Начисляем рейтинг и уведомляем участников
     if (Array.isArray(post.assignedTo) && post.assignedTo.length > 0) {
       await UserCollection.updateMany(
         { _id: { $in: post.assignedTo } },
@@ -472,7 +491,6 @@ export const markNotificationRead = async (req, res) => {
   });
 };
 
-// 💼 Добавить / убрать заинтересованность
 export const toggleInterestedController = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -559,7 +577,6 @@ export const getMyApplicationsController = async (req, res, next) => {
   }
 };
 
-// helpers
 const syncPostCalendarEvent = async (post) => {
   const participants = Array.from(
     new Set([
