@@ -36,7 +36,12 @@ postsRouter.get(
   authenticate,
   ctrlWrapper(postsController.getMyPostsController),
 );
-
+postsRouter.get(
+  '/applications/mine',
+  authenticate,
+  checkBlocked,
+  ctrlWrapper(postNotifications.getMyApplicationsController),
+);
 postsRouter.patch(
   '/applications/:id/withdraw',
   authenticate,
@@ -60,12 +65,7 @@ postsRouter.get(
   optionalAuthenticate,
   ctrlWrapper(postsController.getPostByIdController),
 );
-postsRouter.get(
-  '/applications/mine',
-  authenticate,
-  checkBlocked,
-  ctrlWrapper(postNotifications.getMyApplicationsController),
-);
+
 postsRouter.get(
   '/:id/like',
   optionalAuthenticate,

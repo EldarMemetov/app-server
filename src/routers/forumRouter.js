@@ -22,7 +22,6 @@ import * as commentLikesController from '../controllers/commentLikesController.j
 
 const forumRouter = Router();
 
-// --- Topics ---
 forumRouter.get(
   '/',
   optionalAuthenticate,

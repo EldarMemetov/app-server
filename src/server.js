@@ -49,7 +49,7 @@ export const setupServer = () => {
   app.use('/profile', profileRouter);
   app.use('/people', profilePublicRouter);
   app.use('/posts', postsRouter);
-  app.use('/forum', forumRouter); // ← NEW
+  app.use('/forum', forumRouter);
   app.use('/moderation', moderatorRouter);
   app.use('/portfolio', portfolioRouter);
   app.use('/location', locationRouter);

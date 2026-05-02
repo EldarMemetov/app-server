@@ -1,5 +1,9 @@
 import PostCollection from '../db/models/Post.js';
 import UserCollection from '../db/models/User.js';
+
+const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const ci = (v) => new RegExp(`^${escapeRegex(v)}$`, 'i');
+
 export const filterPostsController = async (req, res) => {
   const {
     city,
@@ -8,39 +12,45 @@ export const filterPostsController = async (req, res) => {
     type,
     priceMin,
     priceMax,
+    status,
     page = 1,
     limit = 20,
   } = req.query;
 
-  const filter = {};
+  const filter = { status: status || 'open' };
 
-  if (city) filter.city = city;
-  if (country) filter.country = country;
-  if (roleNeeded) filter.roleNeeded = { $in: [roleNeeded] };
+  if (city) filter.city = ci(city);
+  if (country) filter.country = ci(country);
+  if (roleNeeded) filter['roleSlots.role'] = roleNeeded;
   if (type) filter.type = type;
-  if (priceMin || priceMax) {
+
+  if (
+    (priceMin || priceMax) &&
+    (!type || ['paid', 'negotiable'].includes(type))
+  ) {
     filter.price = {};
     if (priceMin) filter.price.$gte = Number(priceMin);
     if (priceMax) filter.price.$lte = Number(priceMax);
   }
 
-  const skip = (Number(page) - 1) * Number(limit);
+  const lim = Math.min(Math.max(Number(limit) || 20, 1), 50);
+  const pg = Math.max(Number(page) || 1, 1);
+  const skip = (pg - 1) * lim;
 
-  const posts = await PostCollection.find(filter)
-    .skip(skip)
-    .limit(Number(limit));
-
-  const total = await PostCollection.countDocuments(filter);
+  const [posts, total] = await Promise.all([
+    PostCollection.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(lim)
+      .lean(),
+    PostCollection.countDocuments(filter),
+  ]);
 
   res.json({
     status: 200,
     message: 'Posts filtered successfully',
     data: posts,
-    meta: {
-      page: Number(page),
-      limit: Number(limit),
-      total,
-    },
+    meta: { page: pg, limit: lim, total },
   });
 };
 
@@ -56,11 +66,11 @@ export const filterUsersController = async (req, res) => {
     limit = 20,
   } = req.query;
 
-  const filter = {};
+  const filter = { isBlocked: false };
 
-  if (city) filter.city = city;
-  if (country) filter.country = country;
-  if (role) filter.roles = { $in: [role] };
+  if (city) filter.city = ci(city);
+  if (country) filter.country = ci(country);
+  if (role) filter.roles = role;
   if (directions) {
     const dirsArray = Array.isArray(directions)
       ? directions
@@ -73,23 +83,24 @@ export const filterUsersController = async (req, res) => {
     if (maxRating) filter.rating.$lte = Number(maxRating);
   }
 
-  const skip = (Number(page) - 1) * Number(limit);
+  const lim = Math.min(Math.max(Number(limit) || 20, 1), 50);
+  const pg = Math.max(Number(page) || 1, 1);
+  const skip = (pg - 1) * lim;
 
-  const users = await UserCollection.find(filter)
-    .select('-password')
-    .skip(skip)
-    .limit(Number(limit));
-
-  const total = await UserCollection.countDocuments(filter);
+  const [users, total] = await Promise.all([
+    UserCollection.find(filter)
+      .select('-password')
+      .sort({ rating: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(lim)
+      .lean(),
+    UserCollection.countDocuments(filter),
+  ]);
 
   res.json({
     status: 200,
     message: 'Users filtered successfully',
     data: users,
-    meta: {
-      page: Number(page),
-      limit: Number(limit),
-      total,
-    },
+    meta: { page: pg, limit: lim, total },
   });
 };
