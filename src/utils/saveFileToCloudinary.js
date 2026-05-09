@@ -12,10 +12,7 @@ cloudinary.v2.config({
 
 export const saveFileToCloudinary = async (file) => {
   if (env('ENABLE_CLOUDINARY') !== 'true') {
-    return {
-      url: `/uploads/${file.filename}`,
-      public_id: null,
-    };
+    return { url: `/uploads/${file.filename}`, public_id: null };
   }
 
   try {
@@ -35,11 +32,16 @@ export const saveFileToCloudinary = async (file) => {
   }
 };
 
-export const deleteFromCloudinary = async (publicId) => {
+export const deleteFromCloudinary = async (
+  publicId,
+  resourceType = 'image',
+) => {
   if (!publicId || env('ENABLE_CLOUDINARY') !== 'true') return;
 
   try {
-    await cloudinary.v2.uploader.destroy(publicId);
+    await cloudinary.v2.uploader.destroy(publicId, {
+      resource_type: resourceType,
+    });
   } catch (error) {
     console.error('❌ Error deleting from Cloudinary:', error.message);
   }

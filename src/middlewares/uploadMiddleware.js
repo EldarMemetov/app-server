@@ -24,7 +24,7 @@ const storage = multer.diskStorage({
   },
 });
 
-const GLOBAL_MAX_BYTES = Number(env('GLOBAL_MAX_BYTES') || 125829120); // ~120MB
+const GLOBAL_MAX_BYTES = Number(env('GLOBAL_MAX_BYTES') || 125829120);
 
 const fileFilter = (req, file, cb) => {
   if (!file.mimetype) return cb(null, false);

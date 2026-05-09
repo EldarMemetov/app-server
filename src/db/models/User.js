@@ -16,6 +16,12 @@ const socialLinksSchema = new Schema(
   { _id: false },
 );
 
+const heroMediaItemSchema = new Schema({
+  type: { type: String, enum: ['photo', 'video'], required: true },
+  url: { type: String, required: true },
+  public_id: { type: String },
+});
+
 const userSchema = new Schema(
   {
     name: { type: String, required: true },
@@ -60,18 +66,13 @@ const userSchema = new Schema(
     isBlocked: { type: Boolean, default: false },
     likesCount: { type: Number, default: 0 },
 
-    portfolio: [
-      {
-        type: { type: String, enum: ['photo', 'video'], required: true },
-        url: { type: String, required: true },
-        // для видео — ссылка на YouTube/Vimeo/etc, для фото — Cloudinary url
-        videoLink: { type: String, default: '' },
-        description: { type: String, default: '' },
-        public_id: { type: String },
-      },
-    ],
+    heroType: {
+      type: String,
+      enum: ['showreel', 'slideshow', 'cover'],
+      default: null,
+    },
+    heroMedia: { type: [heroMediaItemSchema], default: [] },
 
-    // Все соцсети и сайт сгруппированы в одном объекте
     socialLinks: {
       type: socialLinksSchema,
       default: () => ({}),

@@ -3,7 +3,6 @@ import { emailRegexp } from '../constants/users.js';
 import { roles } from '../constants/roles.js';
 import { directionsEnum } from '../constants/rolesEnum.js';
 
-// Переиспользуемая схема для socialLinks
 const socialLinksSchema = Joi.object({
   telegram: Joi.string().uri().allow('').optional(),
   whatsapp: Joi.string().uri().allow('').optional(),
@@ -11,15 +10,6 @@ const socialLinksSchema = Joi.object({
   facebook: Joi.string().uri().allow('').optional(),
   linkedin: Joi.string().uri().allow('').optional(),
   website: Joi.string().uri().allow('').optional(),
-});
-
-// Переиспользуемая схема для элемента портфолио
-const portfolioItemSchema = Joi.object({
-  type: Joi.string().valid('photo', 'video').required(),
-  url: Joi.string().uri().required(),
-  // videoLink — ссылка на YouTube/Vimeo/etc (только для type: 'video')
-  videoLink: Joi.string().uri().allow('').optional(),
-  description: Joi.string().max(200).allow('').optional(),
 });
 
 export const userSignupSchema = Joi.object({
@@ -72,9 +62,6 @@ export const userUpdateProfileSchema = Joi.object({
 
   onlineStatus: Joi.boolean().optional(),
 
-  portfolio: Joi.array().items(portfolioItemSchema).optional(),
-
-  // Соцсети и сайт — единый объект, можно передавать частично
   socialLinks: socialLinksSchema.optional(),
 
   availability: Joi.string()
@@ -82,4 +69,11 @@ export const userUpdateProfileSchema = Joi.object({
     .optional(),
 
   languages: Joi.array().items(Joi.string().min(2).max(50)).optional(),
+});
+
+export const heroModeSchema = Joi.object({
+  heroType: Joi.string()
+    .valid('showreel', 'slideshow', 'cover')
+    .allow(null)
+    .required(),
 });

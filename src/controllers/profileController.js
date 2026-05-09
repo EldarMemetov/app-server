@@ -28,8 +28,6 @@ const buildSafeUpdate = (body) => {
   if (Array.isArray(body.languages)) update.languages = body.languages;
   if (Array.isArray(body.portfolio)) update.portfolio = body.portfolio;
 
-  // socialLinks — мержим через dot-notation чтобы не затирать
-  // незатронутые поля (например, если передан только instagram — telegram остаётся)
   if (body.socialLinks && typeof body.socialLinks === 'object') {
     const allowed = [
       'telegram',
@@ -49,7 +47,6 @@ const buildSafeUpdate = (body) => {
   return update;
 };
 
-// ─── Получить свой профиль ─────────────────────────────────────
 export const getProfileController = async (req, res) => {
   const { _id } = req.user;
   const user = await UserCollection.findById(_id).select('-password');
@@ -62,11 +59,9 @@ export const getProfileController = async (req, res) => {
   });
 };
 
-// ─── Обновить свой профиль ─────────────────────────────────────
 export const updateProfileController = async (req, res) => {
   const { _id } = req.user;
 
-  // Загрузка фото если есть
   if (req.file) {
     try {
       const { url } = await saveFileToCloudinary(req.file);
@@ -79,7 +74,6 @@ export const updateProfileController = async (req, res) => {
 
   const safeUpdate = buildSafeUpdate(req.body);
 
-  // Фото отдельно (не в ALLOWED_SCALAR, т.к. берём из Cloudinary)
   if (req.body.photo) safeUpdate.photo = req.body.photo;
 
   if (Object.keys(safeUpdate).length === 0) {
@@ -101,7 +95,6 @@ export const updateProfileController = async (req, res) => {
   });
 };
 
-// ─── Получить все профили ──────────────────────────────────────
 export const getAllProfilesController = async (req, res) => {
   const users = await UserCollection.find().select('-password');
   res.json({
@@ -111,7 +104,6 @@ export const getAllProfilesController = async (req, res) => {
   });
 };
 
-// ─── Получить профиль по ID ────────────────────────────────────
 export const getProfileByIdController = async (req, res) => {
   const { id } = req.params;
   const user = await UserCollection.findById(id).select('-password');

@@ -118,7 +118,6 @@ export const uploadPostMediaController = async (req, res) => {
   }
 };
 
-// === Удаление медиа из поста ===
 export const deletePostMediaController = async (req, res) => {
   const { id, mediaId } = req.params;
   const { _id: userId } = req.user;
