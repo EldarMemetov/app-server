@@ -6,7 +6,7 @@ const projectResultSchema = new Schema(
       type: Schema.Types.ObjectId,
       ref: 'post',
       required: true,
-      unique: true, // Один результат на пост (от автора)
+      unique: true,
       index: true,
     },
     author: {

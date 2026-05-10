@@ -2,11 +2,10 @@ import { Schema, model } from 'mongoose';
 
 const commentSchema = new Schema(
   {
-    // Вместо postId — универсальная пара
     targetType: {
       type: String,
       required: true,
-      enum: ['post', 'forumTopic'], // расширяемо
+      enum: ['post', 'forumTopic'],
       index: true,
     },
     targetId: {
