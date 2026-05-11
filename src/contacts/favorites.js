@@ -3,17 +3,18 @@ import createHttpError from 'http-errors';
 import Favorite from '../db/models/Favorite.js';
 import PostCollection from '../db/models/Post.js';
 import UserCollection from '../db/models/User.js';
-import ForumTopicCollection from '../db/models/ForumTopic.js'; // ← добавить импорт
+import ForumTopicCollection from '../db/models/ForumTopic.js';
 
 const TARGET_MAP = {
   post: PostCollection,
   user: UserCollection,
-  forumTopic: ForumTopicCollection, // ← добавить в мапу
+  forumTopic: ForumTopicCollection,
 };
 
+const ALLOWED_TARGET_TYPES = ['post', 'user', 'forumTopic'];
+
 export const toggleFavorite = async ({ userId, targetType, targetId }) => {
-  if (!['post', 'user', 'forumTopic'].includes(targetType)) {
-    // ← + forumTopic
+  if (!ALLOWED_TARGET_TYPES.includes(targetType)) {
     throw createHttpError(400, 'Invalid targetType');
   }
 
@@ -52,6 +53,11 @@ export const getMyFavoritesController = async (req, res, next) => {
     if (!userId) return next(createHttpError(401, 'User not authenticated'));
 
     const targetType = req.query.type || 'post';
+
+    if (!ALLOWED_TARGET_TYPES.includes(targetType)) {
+      return next(createHttpError(400, 'Invalid targetType'));
+    }
+
     const page = Math.max(1, Number(req.query.page || 1));
     const limit = Math.min(100, Number(req.query.limit || 20));
     const skip = (page - 1) * limit;
@@ -74,7 +80,6 @@ export const getMyFavoritesController = async (req, res, next) => {
     }
 
     if (targetType === 'forumTopic') {
-      // ← новая ветка
       const topics = await ForumTopicCollection.find({ _id: { $in: ids } })
         .populate('author', 'name surname photo')
         .lean();
@@ -84,9 +89,10 @@ export const getMyFavoritesController = async (req, res, next) => {
     }
 
     if (targetType === 'user') {
-      // ← сразу заодно закроем
       const users = await UserCollection.find({ _id: { $in: ids } })
-        .select('-password')
+        .select(
+          'name surname photo country city roles rating directions onlineStatus',
+        )
         .lean();
       const byId = new Map(users.map((u) => [String(u._id), u]));
       const ordered = ids.map((id) => byId.get(id)).filter(Boolean);
