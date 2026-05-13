@@ -7,7 +7,6 @@ import { createNotification } from '../utils/notifications.js';
 import Application from '../db/models/Application.js';
 import { checkPostStatus } from '../services/postStatusService.js';
 
-/// ✅ Подать заявку на пост
 export const applyToPostController = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -382,72 +381,72 @@ export const assignCandidateController = async (req, res, next) => {
   }
 };
 
-export const completePostController = async (req, res, next) => {
-  try {
-    const io = req.app?.get('io');
-    const { id } = req.params;
-    const currentUserId = req.user._id;
+// export const completePostController = async (req, res, next) => {
+//   try {
+//     const io = req.app?.get('io');
+//     const { id } = req.params;
+//     const currentUserId = req.user._id;
 
-    const post = await PostCollection.findById(id);
-    if (!post) return next(createHttpError(404, 'Post not found'));
+//     const post = await PostCollection.findById(id);
+//     if (!post) return next(createHttpError(404, 'Post not found'));
 
-    if (post.author.toString() !== currentUserId.toString()) {
-      return next(
-        createHttpError(403, 'Only the post author can confirm shooting'),
-      );
-    }
+//     if (post.author.toString() !== currentUserId.toString()) {
+//       return next(
+//         createHttpError(403, 'Only the post author can confirm shooting'),
+//       );
+//     }
 
-    if (post.status !== 'in_progress') {
-      return next(
-        createHttpError(400, 'Post must be in_progress to confirm shooting'),
-      );
-    }
+//     if (post.status !== 'in_progress') {
+//       return next(
+//         createHttpError(400, 'Post must be in_progress to confirm shooting'),
+//       );
+//     }
 
-    post.status = 'shooting_done';
-    await post.save();
+//     post.status = 'shooting_done';
+//     await post.save();
 
-    if (Array.isArray(post.assignedTo) && post.assignedTo.length > 0) {
-      await UserCollection.updateMany(
-        { _id: { $in: post.assignedTo } },
-        { $inc: { rating: 10 } },
-      );
+//     if (Array.isArray(post.assignedTo) && post.assignedTo.length > 0) {
+//       await UserCollection.updateMany(
+//         { _id: { $in: post.assignedTo } },
+//         { $inc: { rating: 10 } },
+//       );
 
-      await Application.updateMany(
-        { post: post._id, user: { $in: post.assignedTo } },
-        { $set: { status: 'completed' } },
-      );
+//       await Application.updateMany(
+//         { post: post._id, user: { $in: post.assignedTo } },
+//         { $set: { status: 'completed' } },
+//       );
 
-      await UserCollection.findByIdAndUpdate(post.author, {
-        $inc: { rating: 5 },
-      });
+//       await UserCollection.findByIdAndUpdate(post.author, {
+//         $inc: { rating: 5 },
+//       });
 
-      for (const uid of post.assignedTo) {
-        const notification = await createNotification({
-          user: uid,
-          type: 'post',
-          key: 'shooting_completed',
-          title: `Съёмка "${post.title}" завершена!`,
-          message: 'Теперь вы можете оставить отзыв о проекте',
-          relatedPost: post._id,
-          meta: { postId: post._id, user: uid },
-          unique: true,
-          uniqueMetaKeys: ['postId', 'user'],
-        });
-        if (io) {
-          io.sendToUser(uid, 'notification:new', notification);
-        }
-      }
-    }
+//       for (const uid of post.assignedTo) {
+//         const notification = await createNotification({
+//           user: uid,
+//           type: 'post',
+//           key: 'shooting_completed',
+//           title: `Съёмка "${post.title}" завершена!`,
+//           message: 'Теперь вы можете оставить отзыв о проекте',
+//           relatedPost: post._id,
+//           meta: { postId: post._id, user: uid },
+//           unique: true,
+//           uniqueMetaKeys: ['postId', 'user'],
+//         });
+//         if (io) {
+//           io.sendToUser(uid, 'notification:new', notification);
+//         }
+//       }
+//     }
 
-    res.json({
-      status: 200,
-      message: 'Shooting confirmed. Participants can now leave reviews.',
-      data: post,
-    });
-  } catch (err) {
-    next(err);
-  }
-};
+//     res.json({
+//       status: 200,
+//       message: 'Shooting confirmed. Participants can now leave reviews.',
+//       data: post,
+//     });
+//   } catch (err) {
+//     next(err);
+//   }
+// };
 
 export const getUserNotifications = async (req, res) => {
   const userId = req.user._id;

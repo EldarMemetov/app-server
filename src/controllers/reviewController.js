@@ -5,6 +5,7 @@ import Application from '../db/models/Application.js';
 import createHttpError from 'http-errors';
 import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
 import { createNotification } from '../utils/notifications.js';
+import UserCollection from '../db/models/User.js';
 
 // ✅ Автор подтверждает что съёмка прошла
 export const confirmShootingController = async (req, res, next) => {
@@ -31,6 +32,31 @@ export const confirmShootingController = async (req, res, next) => {
     post.status = 'shooting_done';
     await post.save();
 
+    // 🆕 Начисляем баллы участникам и автору
+    if (Array.isArray(post.assignedTo) && post.assignedTo.length > 0) {
+      const participantsResult = await UserCollection.updateMany(
+        { _id: { $in: post.assignedTo } },
+        { $inc: { rating: 10 } },
+      );
+      console.log(
+        '[confirmShooting] participants rating updated:',
+        participantsResult,
+      );
+
+      const authorResult = await UserCollection.findByIdAndUpdate(
+        post.author,
+        { $inc: { rating: 5 } },
+        { new: true },
+      );
+      console.log('[confirmShooting] author rating now:', authorResult?.rating);
+
+      // 🆕 Меняем статус заявок на 'completed'
+      await Application.updateMany(
+        { post: post._id, user: { $in: post.assignedTo } },
+        { $set: { status: 'completed' } },
+      );
+    }
+
     // Уведомляем всех участников
     const participants = post.assignedTo || [];
     for (const participantId of participants) {
@@ -41,7 +67,7 @@ export const confirmShootingController = async (req, res, next) => {
         title: `Съёмка "${post.title}" завершена!`,
         message: 'Теперь вы можете оставить отзыв о проекте',
         relatedPost: post._id,
-        meta: { postId: post._id },
+        meta: { postId: post._id, user: participantId },
         unique: true,
         uniqueMetaKeys: ['postId', 'user'],
       });

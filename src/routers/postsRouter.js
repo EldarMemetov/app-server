@@ -171,12 +171,12 @@ postsRouter.patch(
   ctrlWrapper(postNotifications.assignCandidateController),
 );
 
-postsRouter.patch(
-  '/:id/complete',
-  authenticate,
-  checkBlocked,
-  ctrlWrapper(postNotifications.completePostController),
-);
+// postsRouter.patch(
+//   '/:id/complete',
+//   authenticate,
+//   checkBlocked,
+//   ctrlWrapper(postNotifications.completePostController),
+// );
 postsRouter.post(
   '/:id/media',
   authenticate,
