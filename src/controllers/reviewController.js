@@ -381,7 +381,10 @@ export const getUserCompletedProjectsController = async (req, res, next) => {
             .populate('author', 'name surname photo role')
             .lean(),
           ProjectResult.findOne({ post: post._id }).lean(),
-          Application.find({ post: post._id, status: 'selected' })
+          Application.find({
+            post: post._id,
+            status: { $in: ['selected', 'completed'] },
+          })
             .populate('user', 'name surname photo role')
             .lean(),
         ]);
