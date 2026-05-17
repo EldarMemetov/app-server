@@ -50,6 +50,17 @@ const userSchema = new Schema(
     email: { type: String, match: emailRegexp, required: true, unique: true },
     password: { type: String, required: true },
 
+    agreedToPolicy: {
+      type: Boolean,
+      required: true,
+      default: false,
+      validate: {
+        validator: (v) => v === true,
+        message: 'You must agree to the privacy policy',
+      },
+    },
+    agreedToPolicyAt: { type: Date },
+
     rating: { type: Number, default: 0 },
     experience: { type: String, default: '' },
     directions: {

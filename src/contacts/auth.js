@@ -44,6 +44,7 @@ export const signup = async (payload) => {
     city,
     roles: incomingRoles,
     role,
+    agreedToPolicy,
   } = payload || {};
 
   if (!email || !password || !name || !surname || !country || !city) {
@@ -51,6 +52,11 @@ export const signup = async (payload) => {
       400,
       'Missing required fields: email, password, name, surname, country, city are required',
     );
+  }
+
+  // NEW: согласие с политикой обязательно
+  if (agreedToPolicy !== true) {
+    throw createHttpError(400, 'You must agree to the privacy policy');
   }
 
   let roles = [];
@@ -76,6 +82,8 @@ export const signup = async (payload) => {
       ...payload,
       password: hashPassword,
       roles,
+      agreedToPolicy: true,
+      agreedToPolicyAt: new Date(),
     });
 
     const userObj = created.toObject ? created.toObject() : created;

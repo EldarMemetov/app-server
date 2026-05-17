@@ -29,6 +29,11 @@ export const userSignupSchema = Joi.object({
     .items(Joi.string().valid(...directionsEnum))
     .max(6)
     .optional(),
+
+  agreedToPolicy: Joi.boolean().valid(true).required().messages({
+    'any.only': 'You must agree to the privacy policy',
+    'any.required': 'You must agree to the privacy policy',
+  }),
 });
 
 export const userSigninSchema = Joi.object({
