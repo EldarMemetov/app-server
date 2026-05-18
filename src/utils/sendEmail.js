@@ -1,40 +1,49 @@
-// import nodemailer from 'nodemailer';
+// import axios from 'axios';
+// import { env } from './env.js';
 
-// import { SMTP } from '../constants/index.js';
-// import { env } from '../utils/env.js';
-
-// const transporter = nodemailer.createTransport({
-//   host: env(SMTP.SMTP_HOST),
-//   port: Number(env(SMTP.SMTP_PORT)),
-//   auth: {
-//     user: env(SMTP.SMTP_USER),
-//     pass: env(SMTP.SMTP_PASSWORD),
-//   },
-// });
-
-// export const sendEmail = async (options) => {
-//   return await transporter.sendMail(options);
+// export const sendEmail = async ({ to, subject, html }) => {
+//   await axios.post(
+//     'https://api.brevo.com/v3/smtp/email',
+//     {
+//       sender: {
+//         name: 'App Support',
+//         email: env('SMTP_FROM'),
+//       },
+//       to: [{ email: to }],
+//       subject,
+//       htmlContent: html,
+//     },
+//     {
+//       headers: {
+//         'api-key': env('BREVO_API_KEY'),
+//         'Content-Type': 'application/json',
+//       },
+//     },
+//   );
 // };
 import axios from 'axios';
 import { env } from './env.js';
 
-export const sendEmail = async ({ to, subject, html }) => {
-  await axios.post(
-    'https://api.brevo.com/v3/smtp/email',
-    {
-      sender: {
-        name: 'App Support',
-        email: env('SMTP_FROM'),
-      },
-      to: [{ email: to }],
-      subject,
-      htmlContent: html,
+export const sendEmail = async ({ to, subject, html, replyTo, from }) => {
+  const payload = {
+    sender: {
+      name: 'App Support',
+      email: from || env('SMTP_FROM'),
     },
-    {
-      headers: {
-        'api-key': env('BREVO_API_KEY'),
-        'Content-Type': 'application/json',
-      },
+    to: [{ email: to }],
+    subject,
+    htmlContent: html,
+  };
+
+  if (replyTo) {
+    payload.replyTo =
+      typeof replyTo === 'string' ? { email: replyTo } : replyTo;
+  }
+
+  await axios.post('https://api.brevo.com/v3/smtp/email', payload, {
+    headers: {
+      'api-key': env('BREVO_API_KEY'),
+      'Content-Type': 'application/json',
     },
-  );
+  });
 };

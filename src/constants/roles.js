@@ -8,4 +8,6 @@ export const roles = [
   'producer',
   'director',
   'brand',
+  'retoucher',
+  'aiCreator',
 ];

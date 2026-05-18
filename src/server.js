@@ -19,9 +19,10 @@ import locationRouter from './routers/locationRouter.js';
 import notificationsRouter from './routers/notificationsRouter.js';
 import favoritesRouter from './routers/favorites.js';
 import profilePublicRouter from './routers/profilePublicRouter.js';
+import contactRouter from './routers/contact.js';
 import reviewsRouter from './routers/reviews.js';
 import calendarRouter from './routers/calendarRouter.js';
-import forumRouter from './routers/forumRouter.js'; // ← NEW
+import forumRouter from './routers/forumRouter.js';
 
 import corsOptions from './utils/corsOptions.js';
 import { initSocket } from './socket/socket.js';
@@ -29,6 +30,7 @@ import { updateAllPostsStatus } from './services/postStatusService.js';
 
 export const setupServer = () => {
   const app = express();
+  app.set('trust proxy', 1);
   const port = Number(env('PORT', 3000));
 
   app.use(helmet());
@@ -57,6 +59,7 @@ export const setupServer = () => {
   app.use('/favorites', favoritesRouter);
   app.use('/calendar', calendarRouter);
   app.use('/', reviewsRouter);
+  app.use('/contact', contactRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
