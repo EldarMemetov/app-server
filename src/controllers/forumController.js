@@ -7,7 +7,7 @@ import LikeCollection from '../db/models/like.js';
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 const isAdminOrMod = (user) =>
-  user && ['admin', 'moderator'].includes(user.role);
+  user && ['admin', 'moderator'].includes(user.accessRole);
 
 export const createTopicController = async (req, res, next) => {
   try {

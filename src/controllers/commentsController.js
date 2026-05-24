@@ -10,7 +10,6 @@ import { NotificationService } from '../utils/notificationService.js';
 const getCommentIdFromParams = (params) =>
   params.commentId || params.id || null;
 
-// Определяем target по роуту: /posts/:id/... или /forum/:id/...
 const getTargetFromReq = (req) => {
   const targetId = req.params.id || req.params.postId || req.params.topicId;
   const isForum = (req.baseUrl || req.originalUrl || '').includes('/forum');
@@ -79,7 +78,6 @@ export const addCommentController = async (req, res, next) => {
       replyTo: replyTo || null,
     });
 
-    // Инкрементим commentsCount у таргета (если поле есть)
     await TargetModel.findByIdAndUpdate(targetId, {
       $inc: { commentsCount: 1 },
     });
@@ -95,7 +93,6 @@ export const addCommentController = async (req, res, next) => {
         parentComment: parent,
         text,
         postId: targetType === 'post' ? targetId : null,
-        // можешь расширить NotificationService полями targetType/targetId
       });
     }
 
@@ -193,10 +190,10 @@ export const updateCommentController = async (req, res, next) => {
     const comment = await Comment.findById(commentId);
     if (!comment) return next(createHttpError(404, 'Comment not found'));
 
-    if (
-      String(comment.author) !== String(userId) &&
-      req.user.role !== 'admin'
-    ) {
+    const isPrivileged =
+      req.user.accessRole === 'admin' || req.user.accessRole === 'moderator';
+
+    if (String(comment.author) !== String(userId) && !isPrivileged) {
       return next(createHttpError(403, 'You can edit only your comments'));
     }
 
@@ -246,28 +243,33 @@ export const deleteCommentController = async (req, res, next) => {
 
     const comment = await Comment.findById(commentId);
     if (!comment) return next(createHttpError(404, 'Comment not found'));
-
-    // Автор цели тоже может удалить коммент у себя
-    let isTargetAuthor = false;
-    if (comment.targetType === 'post') {
-      const post = await PostCollection.findById(comment.targetId)
-        .select('author')
-        .lean();
-      isTargetAuthor = post && String(post.author) === String(userId);
-    } else if (comment.targetType === 'forumTopic') {
-      const topic = await ForumTopicCollection.findById(comment.targetId)
-        .select('author')
-        .lean();
-      isTargetAuthor = topic && String(topic.author) === String(userId);
+    if (comment.deleted) {
+      return res.json({ status: 200, message: 'Already deleted' });
     }
-    const isCommentAuthor = String(comment.author) === String(userId);
 
-    if (!isCommentAuthor && !isTargetAuthor && req.user.role !== 'admin') {
+    const isCommentAuthor = String(comment.author) === String(userId);
+    const isPrivileged =
+      req.user.accessRole === 'admin' || req.user.accessRole === 'moderator';
+
+    if (!isCommentAuthor && !isPrivileged) {
       return next(createHttpError(403, 'Not allowed'));
     }
 
     comment.deleted = true;
+    if (isPrivileged && !isCommentAuthor) {
+      comment.status = 'hidden';
+      comment.text = '[deleted by moderator]';
+    }
     await comment.save();
+
+    const TargetModel =
+      comment.targetType === 'forumTopic'
+        ? ForumTopicCollection
+        : PostCollection;
+
+    await TargetModel.findByIdAndUpdate(comment.targetId, {
+      $inc: { commentsCount: -1 },
+    });
 
     try {
       const io = req.app?.get('io');
@@ -278,6 +280,7 @@ export const deleteCommentController = async (req, res, next) => {
             targetType: comment.targetType,
             targetId: String(comment.targetId),
             commentId: String(comment._id),
+            byModerator: isPrivileged && !isCommentAuthor,
           },
         );
       }

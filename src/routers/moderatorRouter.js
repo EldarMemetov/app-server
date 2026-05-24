@@ -6,67 +6,50 @@ import * as moderationCtrl from '../contacts/moderation.js';
 
 const router = express.Router();
 
-router.get(
-  '/users',
-  authenticate,
-  checkRole(['moderator', 'admin']),
-  ctrlWrapper(moderationCtrl.getAllUsers),
-);
+router.use(authenticate, checkRole(['moderator', 'admin']));
 
+/* ---------- USERS ---------- */
+router.get('/users', ctrlWrapper(moderationCtrl.getAllUsers));
+router.patch('/users/:id/block', ctrlWrapper(moderationCtrl.blockUser));
+router.patch('/users/:id/unblock', ctrlWrapper(moderationCtrl.unblockUser));
+
+// смена роли — только админ
 router.patch(
-  '/users/:id/block',
-  authenticate,
-  checkRole(['moderator', 'admin']),
-  ctrlWrapper(moderationCtrl.blockUser),
+  '/users/:id/role',
+  checkRole(['admin']),
+  ctrlWrapper(moderationCtrl.changeUserRole),
 );
 
-router.patch(
-  '/users/:id/unblock',
-  authenticate,
-  checkRole(['moderator', 'admin']),
-  ctrlWrapper(moderationCtrl.unblockUser),
-);
+/* ---------- POSTS ---------- */
+router.get('/posts', ctrlWrapper(moderationCtrl.getAllPosts));
+router.delete('/posts/:id', ctrlWrapper(moderationCtrl.deletePost));
 
+/* ---------- COMMENTS ---------- */
+// мягкое удаление одного коммента (ответы остаются) — основной способ для модератора
 router.delete(
-  '/users/:id/photo',
-  authenticate,
-  checkRole(['moderator', 'admin']),
-  ctrlWrapper(moderationCtrl.deleteUserPhoto),
-);
-
-router.delete(
-  '/users/:id/about',
-  authenticate,
-  checkRole(['moderator', 'admin']),
-  ctrlWrapper(moderationCtrl.clearUserAbout),
-);
-
-router.delete(
-  '/users/:id/portfolio/:itemId',
-  authenticate,
-  checkRole(['moderator', 'admin']),
-  ctrlWrapper(moderationCtrl.deletePortfolioItem),
-);
-
-router.get(
-  '/posts',
-  authenticate,
-  checkRole(['moderator', 'admin']),
-  ctrlWrapper(moderationCtrl.getAllPosts),
-);
-
-router.delete(
-  '/posts/:id',
-  authenticate,
-  checkRole(['moderator', 'admin']),
-  ctrlWrapper(moderationCtrl.deletePost),
-);
-
-router.delete(
-  '/posts/:postId/comments/:commentId',
-  authenticate,
-  checkRole(['moderator', 'admin']),
+  '/comments/:commentId',
   ctrlWrapper(moderationCtrl.deleteComment),
+);
+// физическое удаление одного коммента — только админ (ответы НЕ удаляются)
+router.delete(
+  '/comments/:commentId/hard',
+  checkRole(['admin']),
+  ctrlWrapper(moderationCtrl.hardDeleteComment),
+);
+
+/* ---------- FORUM ---------- */
+router.get('/forum/topics', ctrlWrapper(moderationCtrl.getAllForumTopics));
+
+// soft (модератор + админ) — обычное удаление темы
+router.delete(
+  '/forum/topics/:id',
+  ctrlWrapper(moderationCtrl.softDeleteForumTopic),
+);
+// hard (только админ) — физический снос темы со всем содержимым
+router.delete(
+  '/forum/topics/:id/hard',
+  checkRole(['admin']),
+  ctrlWrapper(moderationCtrl.hardDeleteForumTopic),
 );
 
 export default router;

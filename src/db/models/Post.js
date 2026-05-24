@@ -34,7 +34,7 @@ const postSchema = new Schema(
       enum: ['tfp', 'percent', 'paid', 'negotiable'],
       default: 'tfp',
     },
-
+    commentsCount: { type: Number, default: 0 },
     price: { type: Number, default: 0 },
 
     percent: { type: Number, default: 0, min: 0, max: 100 },
