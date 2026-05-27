@@ -51,8 +51,8 @@ export const userUpdateProfileSchema = Joi.object({
   country: Joi.string().min(2).max(100).optional(),
   city: Joi.string().min(2).max(50).optional(),
   photo: Joi.string().uri().optional(),
-  aboutMe: Joi.string().max(500).allow('').optional(),
-  experience: Joi.string().max(500).allow('').optional(),
+  aboutMe: Joi.string().max(1000).allow('').optional(),
+  experience: Joi.string().max(1000).allow('').optional(),
 
   roles: Joi.array()
     .items(Joi.string().valid(...roles))
