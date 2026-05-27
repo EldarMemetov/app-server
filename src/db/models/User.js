@@ -59,6 +59,8 @@ const userSchema = new Schema(
         message: 'You must agree to the privacy policy',
       },
     },
+    verify: { type: Boolean, required: true, default: false },
+    lastVerificationEmailSentAt: { type: Date, default: null },
     agreedToPolicyAt: { type: Date },
 
     rating: { type: Number, default: 0 },

@@ -3,7 +3,7 @@ import { resetPassword } from '../contacts/auth.js';
 import { generateGoogleOAuthUrl } from '../utils/googleOAuth.js';
 import { signup } from '../contacts/auth.js';
 import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
-
+import { verifyEmail, resendVerificationEmail } from '../contacts/auth.js';
 const isProd = process.env.NODE_ENV === 'production';
 
 const setupSession = (res, session) => {
@@ -26,7 +26,6 @@ const setupSession = (res, session) => {
 
 export const signupController = async (req, res) => {
   let photoUrl;
-
   if (req.file) {
     const result = await saveFileToCloudinary(req.file);
     photoUrl = result.url;
@@ -36,7 +35,8 @@ export const signupController = async (req, res) => {
 
   res.status(201).json({
     status: 201,
-    message: 'Successfully register user',
+    message:
+      'Successfully registered. Please check your email to verify your account.',
     data: newUser,
   });
 };
@@ -171,4 +171,32 @@ export const changePasswordController = async (req, res) => {
     console.error('changePasswordController error', err);
     return res.status(500).json({ message: 'Internal Server Error' });
   }
+};
+export const verifyEmailController = async (req, res) => {
+  const token = req.query.token || req.body.token;
+  if (!token) {
+    return res.status(400).json({ status: 400, message: 'Token is required' });
+  }
+
+  const result = await verifyEmail(token);
+
+  res.json({
+    status: 200,
+    message: result.alreadyVerified
+      ? 'Email already verified'
+      : 'Email successfully verified',
+    data: {},
+  });
+};
+
+export const resendVerificationController = async (req, res) => {
+  const { email } = req.body;
+  await resendVerificationEmail(email);
+
+  res.json({
+    status: 200,
+    message:
+      'Verification email has been sent (if the account exists and is not verified).',
+    data: {},
+  });
 };

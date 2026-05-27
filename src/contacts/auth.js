@@ -16,8 +16,39 @@ import fs from 'node:fs/promises';
 import {
   accessTokenLifetime,
   refreshTokenLifetime,
+  verificationTokenLifetime,
+  resendVerificationCooldownMs,
 } from '../constants/users.js';
 import { validateCode } from '../utils/googleOAuth.js';
+
+const sendVerificationEmail = async (user) => {
+  const verifyToken = jwt.sign(
+    { sub: user._id, email: user.email },
+    env('JWT_SECRET'),
+    { expiresIn: verificationTokenLifetime },
+  );
+
+  const verifyTemplatePath = path.join(TEMPLATES_DIR, 'verify-email.html');
+  const templateSource = (await fs.readFile(verifyTemplatePath)).toString();
+  const template = handlebars.compile(templateSource);
+
+  const html = template({
+    name: user.name,
+    link: `${env('APP_DOMAIN')}/verify-email?token=${verifyToken}`,
+  });
+
+  await sendEmail({
+    from: env('SMTP_FROM'),
+    to: user.email,
+    subject: 'Confirm your email',
+    html,
+  });
+
+  await UserCollection.updateOne(
+    { _id: user._id },
+    { lastVerificationEmailSentAt: new Date() },
+  );
+};
 
 const createSession = () => {
   const accessToken = randomBytes(30).toString('base64');
@@ -54,26 +85,21 @@ export const signup = async (payload) => {
     );
   }
 
-  // NEW: согласие с политикой обязательно
   if (agreedToPolicy !== true) {
     throw createHttpError(400, 'You must agree to the privacy policy');
   }
 
   let roles = [];
-  if (Array.isArray(incomingRoles) && incomingRoles.length > 0) {
+  if (Array.isArray(incomingRoles) && incomingRoles.length > 0)
     roles = incomingRoles;
-  } else if (role) {
-    roles = Array.isArray(role) ? role : [role];
-  }
+  else if (role) roles = Array.isArray(role) ? role : [role];
 
   if (!roles || roles.length === 0) {
     throw createHttpError(400, 'At least one role is required');
   }
 
   const existing = await UserCollection.findOne({ email }).lean();
-  if (existing) {
-    throw createHttpError(409, 'Email already exist');
-  }
+  if (existing) throw createHttpError(409, 'Email already exist');
 
   const hashPassword = await bcrypt.hash(password, 10);
 
@@ -84,33 +110,37 @@ export const signup = async (payload) => {
       roles,
       agreedToPolicy: true,
       agreedToPolicyAt: new Date(),
+      verify: false,
     });
+
+    try {
+      await sendVerificationEmail(created);
+    } catch (mailErr) {
+      console.error('Failed to send verification email:', mailErr);
+    }
 
     const userObj = created.toObject ? created.toObject() : created;
     delete userObj.password;
     return userObj;
   } catch (err) {
-    if (err && err.code === 11000) {
+    if (err && err.code === 11000)
       throw createHttpError(409, 'Email already exist');
-    }
-
-    if (err && err.name === 'ValidationError') {
+    if (err && err.name === 'ValidationError')
       throw createHttpError(400, err.message);
-    }
-
     throw err;
   }
 };
+
 export const signin = async (payload) => {
   const { email, password } = payload;
   const user = await UserCollection.findOne({ email });
-  if (!user) {
-    throw createHttpError(401, 'Email or password invalid');
-  }
+  if (!user) throw createHttpError(401, 'Email or password invalid');
 
   const passwordCompare = await bcrypt.compare(password, user.password);
-  if (!passwordCompare) {
-    throw createHttpError(401, 'Email or password invalid');
+  if (!passwordCompare) throw createHttpError(401, 'Email or password invalid');
+
+  if (!user.verify) {
+    throw createHttpError(403, 'Please verify your email before signing in');
   }
 
   await SessionCollection.deleteMany({ userId: user._id });
@@ -310,4 +340,54 @@ export const changePassword = async (userId, currentPassword, newPassword) => {
   }
 
   return true;
+};
+
+export const verifyEmail = async (token) => {
+  let decoded;
+  try {
+    decoded = jwt.verify(token, env('JWT_SECRET'));
+  } catch (err) {
+    throw createHttpError(401, 'Invalid or expired verification token');
+  }
+
+  const user = await UserCollection.findOne({
+    _id: decoded.sub,
+    email: decoded.email,
+  });
+  if (!user) throw createHttpError(404, 'User not found');
+
+  if (user.verify) {
+    return { alreadyVerified: true };
+  }
+
+  await UserCollection.updateOne({ _id: user._id }, { verify: true });
+  return { alreadyVerified: false };
+};
+
+export const resendVerificationEmail = async (email) => {
+  if (!email) throw createHttpError(400, 'Email is required');
+
+  const user = await UserCollection.findOne({ email });
+
+  if (!user) return;
+
+  if (user.verify) {
+    throw createHttpError(400, 'Email is already verified');
+  }
+
+  if (user.lastVerificationEmailSentAt) {
+    const diff =
+      Date.now() - new Date(user.lastVerificationEmailSentAt).getTime();
+    if (diff < resendVerificationCooldownMs) {
+      const retryAfterSec = Math.ceil(
+        (resendVerificationCooldownMs - diff) / 1000,
+      );
+      throw createHttpError(
+        429,
+        `Please wait ${retryAfterSec} seconds before requesting a new verification email`,
+      );
+    }
+  }
+
+  await sendVerificationEmail(user);
 };

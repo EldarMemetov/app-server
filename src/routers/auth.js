@@ -5,6 +5,8 @@ import * as authControllers from '../controllers/auth.js';
 import {
   userLoginWithGoogleOAuthSchema,
   userSigninSchema,
+  resendVerificationSchema,
+  userSignupSchema,
 } from '../validation/users.js';
 import { requestResetEmailSchema } from '../validation/mail.js';
 import authenticate from '../middlewares/authenticate.js';
@@ -15,7 +17,11 @@ import { resetPasswordSchema } from '../validation/auth.js';
 
 const authRouter = Router();
 
-authRouter.post('/register', ctrlWrapper(authControllers.signupController));
+authRouter.post(
+  '/register',
+  validateBody(userSignupSchema),
+  ctrlWrapper(authControllers.signupController),
+);
 
 authRouter.post(
   '/login',
@@ -54,5 +60,21 @@ authRouter.post(
   authenticate,
   validateBody(changePasswordSchema),
   ctrlWrapper(changePasswordController),
+);
+
+authRouter.get(
+  '/verify-email',
+  ctrlWrapper(authControllers.verifyEmailController),
+);
+
+authRouter.post(
+  '/verify-email',
+  ctrlWrapper(authControllers.verifyEmailController),
+);
+
+authRouter.post(
+  '/resend-verification',
+  validateBody(resendVerificationSchema),
+  ctrlWrapper(authControllers.resendVerificationController),
 );
 export default authRouter;

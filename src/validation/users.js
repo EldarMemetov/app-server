@@ -82,3 +82,7 @@ export const heroModeSchema = Joi.object({
     .allow(null)
     .required(),
 });
+
+export const resendVerificationSchema = Joi.object({
+  email: Joi.string().pattern(emailRegexp).required(),
+});
