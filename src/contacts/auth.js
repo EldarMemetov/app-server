@@ -131,10 +131,58 @@ export const signup = async (payload) => {
   }
 };
 
+Держи все 4 файла полностью — просто скопируй и замени.
+
+1. middlewares/authenticate.js
+import createHttpError from 'http-errors';
+
+import * as authServices from '../contacts/auth.js';
+
+const authenticate = async (req, res, next) => {
+  const authorization = req.get('Authorization');
+
+  if (!authorization) {
+    return next(createHttpError(401, 'Authorization header not found'));
+  }
+
+  const [bearer, token] = authorization.split(' ');
+  if (bearer !== 'Bearer') {
+    return next(createHttpError(401, 'Authorization must have Bearer type'));
+  }
+
+  const session = await authServices.findSessionByAccessToken(token);
+
+  if (!session) {
+    return next(createHttpError(401, 'Session not found'));
+  }
+  if (new Date() > session.accessTokenValidUntil) {
+    return next(createHttpError(401, 'Access token expired'));
+  }
+
+  const user = await authServices.findUser({ _id: session.userId });
+  if (!user) {
+    return next(createHttpError(401, 'User not found'));
+  }
+  if (user.isDeleted) {
+    return next(createHttpError(401, 'Account has been deleted'));
+  }
+  if (user.isBlocked) {
+    return next(createHttpError(403, 'User is blocked'));
+  }
+  req.user = user;
+
+  next();
+};
+
+
 export const signin = async (payload) => {
   const { email, password } = payload;
   const user = await UserCollection.findOne({ email });
   if (!user) throw createHttpError(401, 'Email or password invalid');
+
+  if (user.isDeleted) {
+    throw createHttpError(401, 'Email or password invalid');
+  }
 
   const passwordCompare = await bcrypt.compare(password, user.password);
   if (!passwordCompare) throw createHttpError(401, 'Email or password invalid');
@@ -150,14 +198,13 @@ export const signin = async (payload) => {
   const sessionDoc = await SessionCollection.create({
     userId: user._id,
     accessToken: sessionData.accessToken,
-    refreshToken: hashToken(sessionData.refreshToken), // хэш
+    refreshToken: hashToken(sessionData.refreshToken),
     accessTokenValidUntil: sessionData.accessTokenValidUntil,
     refreshTokenValidUntil: sessionData.refreshTokenValidUntil,
   });
 
   return {
     ...sessionDoc.toObject(),
-
     refreshToken: sessionData.refreshToken,
     accessToken: sessionData.accessToken,
     accessTokenValidUntil: sessionData.accessTokenValidUntil,

@@ -4,6 +4,8 @@ import { generateGoogleOAuthUrl } from '../utils/googleOAuth.js';
 import { signup } from '../contacts/auth.js';
 import { saveFileToCloudinary } from '../utils/saveFileToCloudinary.js';
 import { verifyEmail, resendVerificationEmail } from '../contacts/auth.js';
+import { deleteAccount } from '../contacts/deleteAccount.js';
+
 const isProd = process.env.NODE_ENV === 'production';
 
 const setupSession = (res, session) => {
@@ -197,6 +199,30 @@ export const resendVerificationController = async (req, res) => {
     status: 200,
     message:
       'Verification email has been sent (if the account exists and is not verified).',
+    data: {},
+  });
+};
+export const deleteAccountController = async (req, res) => {
+  const userId = req.user && req.user._id;
+  const { password } = req.body;
+
+  await deleteAccount(userId, password);
+
+  const isProd = process.env.NODE_ENV === 'production';
+  res.clearCookie('sessionId', {
+    path: '/',
+    sameSite: isProd ? 'none' : 'lax',
+    secure: isProd,
+  });
+  res.clearCookie('refreshToken', {
+    path: '/',
+    sameSite: isProd ? 'none' : 'lax',
+    secure: isProd,
+  });
+
+  res.status(200).json({
+    status: 200,
+    message: 'Account successfully deleted',
     data: {},
   });
 };

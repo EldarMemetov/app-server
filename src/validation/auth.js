@@ -9,3 +9,7 @@ export const changePasswordSchema = Joi.object({
   currentPassword: Joi.string().min(6).required(),
   newPassword: Joi.string().min(6).required(),
 });
+
+export const deleteAccountSchema = Joi.object({
+  password: Joi.string().min(6).required(),
+});

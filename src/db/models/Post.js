@@ -13,6 +13,7 @@ const roleSlotSchema = new Schema(
 const postSchema = new Schema(
   {
     author: { type: Schema.Types.ObjectId, ref: 'user', required: true },
+    authorDeleted: { type: Boolean, default: false },
     title: { type: String, required: true, trim: true },
     description: { type: String, required: true },
     media: [

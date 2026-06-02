@@ -14,7 +14,7 @@ import authenticate from '../middlewares/authenticate.js';
 import { changePasswordSchema } from '../validation/auth.js';
 import { changePasswordController } from '../controllers/auth.js';
 import { resetPasswordSchema } from '../validation/auth.js';
-
+import { deleteAccountSchema } from '../validation/auth.js';
 const authRouter = Router();
 
 authRouter.post(
@@ -71,10 +71,16 @@ authRouter.post(
   '/verify-email',
   ctrlWrapper(authControllers.verifyEmailController),
 );
-
+authRouter.delete(
+  '/delete-account',
+  authenticate,
+  validateBody(deleteAccountSchema),
+  ctrlWrapper(authControllers.deleteAccountController),
+);
 authRouter.post(
   '/resend-verification',
   validateBody(resendVerificationSchema),
   ctrlWrapper(authControllers.resendVerificationController),
 );
+
 export default authRouter;

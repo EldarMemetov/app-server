@@ -1,4 +1,3 @@
-// db/models/Review.js
 import { Schema, model } from 'mongoose';
 
 const reviewSchema = new Schema(
@@ -15,6 +14,7 @@ const reviewSchema = new Schema(
       required: true,
       index: true,
     },
+    authorDeleted: { type: Boolean, default: false },
     text: {
       type: String,
       required: true,

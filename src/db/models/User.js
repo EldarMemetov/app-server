@@ -46,6 +46,9 @@ const userSchema = new Schema(
       enum: ['user', 'moderator', 'admin'],
       default: 'user',
     },
+    isDeleted: { type: Boolean, default: false },
+    deletedAt: { type: Date, default: null },
+    photoPublicId: { type: String, default: '' },
 
     email: { type: String, match: emailRegexp, required: true, unique: true },
     password: { type: String, required: true },
