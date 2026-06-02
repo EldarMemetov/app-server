@@ -12,7 +12,7 @@ import { sendEmail } from '../utils/sendEmail.js';
 import handlebars from 'handlebars';
 import path from 'node:path';
 import fs from 'node:fs/promises';
-
+import * as authServices from '../contacts/auth.js';
 import {
   accessTokenLifetime,
   refreshTokenLifetime,
@@ -131,14 +131,7 @@ export const signup = async (payload) => {
   }
 };
 
-Держи все 4 файла полностью — просто скопируй и замени.
-
-1. middlewares/authenticate.js
-import createHttpError from 'http-errors';
-
-import * as authServices from '../contacts/auth.js';
-
-const authenticate = async (req, res, next) => {
+export const authenticate = async (req, res, next) => {
   const authorization = req.get('Authorization');
 
   if (!authorization) {
@@ -173,7 +166,6 @@ const authenticate = async (req, res, next) => {
 
   next();
 };
-
 
 export const signin = async (payload) => {
   const { email, password } = payload;
